@@ -15,12 +15,11 @@ from transformers import (
     TrainerControl
 )
 
-from arguments import ModelArguments, DataArguments, \
+from .arguments import ModelArguments, DataArguments, \
     RetrieverTrainingArguments as TrainingArguments
-from data import SameDatasetTrainDataset, EmbedCollator
-from modeling import BGEM3Model
-from trainer import BiTrainer
-
+from .data import SameDatasetTrainDataset, EmbedCollator
+from .modeling import BGEM3Model
+from .trainer import BiTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -28,21 +27,15 @@ logger = logging.getLogger(__name__)
 class TrainerCallbackForDataRefresh(TrainerCallback):
     def __init__(self, train_dataset):
         self.train_dataset = train_dataset
-        
+
     def on_epoch_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-            """
-            Event called at the end of an epoch.
-            """
-            self.train_dataset.refresh_epoch()
-        
+        """
+        Event called at the end of an epoch.
+        """
+        self.train_dataset.refresh_epoch()
+
 
 def main():
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12345'
-    os.environ['RANK'] = '0'
-    os.environ['WORLD_SIZE'] = '1'
-    dist.init_process_group(backend='gloo')
-
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     model_args: ModelArguments
@@ -102,7 +95,7 @@ def main():
                        unified_finetuning=training_args.unified_finetuning,
                        use_self_distill=training_args.use_self_distill,
                        colbert_dim=training_args.colbert_dim,
-                       self_distill_start_step=training_args.self_distill_start_step,)
+                       self_distill_start_step=training_args.self_distill_start_step)
 
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
@@ -118,13 +111,13 @@ def main():
 
     # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:
-        train_dataset = SameDatasetTrainDataset(args=data_args, 
-                                                batch_size=training_args.per_device_train_batch_size, 
-                                                seed=training_args.seed, 
+        train_dataset = SameDatasetTrainDataset(args=data_args,
+                                                batch_size=training_args.per_device_train_batch_size,
+                                                seed=training_args.seed,
                                                 num_processes=training_args.world_size,
                                                 process_index=training_args.process_index)
         training_args.per_device_train_batch_size = 1
-        training_args.dataloader_num_workers = 0    # avoid multi-processes
+        training_args.dataloader_num_workers = 0  # avoid multi-processes
     else:
         raise NotImplementedError("Not support `same_task_within_batch=False`")
 
@@ -133,7 +126,7 @@ def main():
         query_max_len=data_args.query_max_len,
         passage_max_len=data_args.passage_max_len
     )
-    
+
     trainer = BiTrainer(
         model=model,
         args=training_args,
@@ -144,7 +137,7 @@ def main():
 
     if data_args.same_task_within_batch:
         trainer.add_callback(TrainerCallbackForDataRefresh(train_dataset))
-    
+
     Path(training_args.output_dir).mkdir(parents=True, exist_ok=True)
 
     # Training

@@ -12,13 +12,13 @@ torchrun --nproc_per_node 3
 --temperature 0.02 
 --query_max_len 128
 --passage_max_len 512
---train_group_size 2 
---negatives_cross_device yes 
+--train_group_size 2
 --logging_steps 10 
 --same_task_within_batch True 
 --unified_finetuning True 
 --use_self_distill True
 
+--negatives_cross_device yes
 --cache_dir D:/huggingface/cache
 
 python run.py 
