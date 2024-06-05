@@ -14,11 +14,11 @@ from transformers import (
     TrainerControl
 )
 
-from .arguments import ModelArguments, DataArguments, \
+from arguments import ModelArguments, DataArguments, \
     RetrieverTrainingArguments as TrainingArguments
-from .data import SameDatasetTrainDataset, EmbedCollator
-from .modeling import BGEM3Model
-from .trainer import BiTrainer
+from data import SameDatasetTrainDataset, EmbedCollator
+from modeling import BGEM3Model
+from trainer import BiTrainer
 
 logger = logging.getLogger(__name__)
 
