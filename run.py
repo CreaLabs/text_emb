@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-import torch.distributed as dist
 
 from transformers import AutoConfig, AutoTokenizer
 from transformers import (
