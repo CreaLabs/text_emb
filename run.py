@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+import torch.distributed as dist
 
 from transformers import AutoConfig, AutoTokenizer
 from transformers import (
@@ -35,6 +36,12 @@ class TrainerCallbackForDataRefresh(TrainerCallback):
 
 
 def main():
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12345'
+    os.environ['RANK'] = '0'
+    os.environ['WORLD_SIZE'] = '1'
+    dist.init_process_group(backend='gloo')
+
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     model_args: ModelArguments
@@ -94,7 +101,7 @@ def main():
                        unified_finetuning=training_args.unified_finetuning,
                        use_self_distill=training_args.use_self_distill,
                        colbert_dim=training_args.colbert_dim,
-                       self_distill_start_step=training_args.self_distill_start_step)
+                       self_distill_start_step=training_args.self_distill_start_step, )
 
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
