@@ -115,8 +115,7 @@ def main():
         args=training_args,
         train_dataset=dataset,
         data_collator=data_collator,
-        tokenizer=tokenizer,
-        gradient_accumulation_steps=4
+        tokenizer=tokenizer
     )
     trainer.add_callback(TrainerCallbackForSaving())
 
