@@ -21,6 +21,8 @@ from retromae_pretrain.data import DatasetForPretraining, RetroMAECollator
 from retromae_pretrain.modeling import RetroMAEForPretraining
 from retromae_pretrain.trainer import PreTrainer
 
+from accelerate import Accelerator
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,8 +91,10 @@ def main():
     model_class = RetroMAEForPretraining
     collator_class = RetroMAECollator
 
+    accelerator = Accelerator()
+
     if model_args.model_name_or_path:
-        model = model_class.from_pretrained(model_args, model_args.model_name_or_path)
+        model = model_class.from_pretrained(model_args, model_args.model_name_or_path, device_map={"": accelerator.local_process_index})
         logger.info(f"------Load model from {model_args.model_name_or_path}------")
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     elif model_args.config_name:
@@ -108,6 +112,8 @@ def main():
                                    encoder_mlm_probability=data_args.encoder_mlm_probability,
                                    decoder_mlm_probability=data_args.decoder_mlm_probability,
                                    max_seq_length=data_args.max_seq_length)
+
+    model, tokenizer, train_dataset, data_collator = accelerator.prepare(model, tokenizer, dataset, data_collator)
 
     # Initialize our Trainer
     trainer = PreTrainer(
