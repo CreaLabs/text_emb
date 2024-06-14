@@ -85,7 +85,7 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
         input_ids_batch = tensorize_batch(input_ids_batch, self.tokenizer.pad_token_id)
         attention_mask_batch = tensorize_batch(attention_mask_batch, 0)
         origin_input_ids_batch = input_ids_batch.clone()
-        encoder_input_ids_batch = self.torch_mask_tokens(input_ids_batch)
+        encoder_input_ids_batch = input_ids_batch
         decoder_labels_batch = tensorize_batch(decoder_labels_batch, -100)
         matrix_attention_mask_batch = tensorize_batch(decoder_matrix_attention_mask_batch, 0)
 
