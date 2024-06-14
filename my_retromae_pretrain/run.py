@@ -16,10 +16,10 @@ from transformers import (
 )
 from transformers.trainer_utils import is_main_process
 
-from .arguments import DataTrainingArguments, ModelArguments
-from .data import DatasetForPretraining, RetroMAECollator
-from .modeling import RetroMAEForPretraining
-from .trainer import PreTrainer
+from my_retromae_pretrain.arguments import DataTrainingArguments, ModelArguments
+from my_retromae_pretrain.data import DatasetForPretraining, RetroMAECollator
+from my_retromae_pretrain.modeling import RetroMAEForPretraining
+from my_retromae_pretrain.trainer import PreTrainer
 
 logger = logging.getLogger(__name__)
 
