@@ -39,11 +39,12 @@ class RetroMAEForPretraining(nn.Module):
         self.lm.gradient_checkpointing_enable(**kwargs)
 
     def forward(self,
-                encoder_input_ids, encoder_attention_mask,
+                encoder_input_ids, encoder_attention_mask, encoder_labels,
                 decoder_input_ids, decoder_attention_mask, decoder_labels):
 
         lm_out: MaskedLMOutput = self.lm(
             encoder_input_ids, encoder_attention_mask,
+            labels=encoder_labels,
             output_hidden_states=True,
             return_dict=True
         )
