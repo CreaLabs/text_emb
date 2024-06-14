@@ -55,7 +55,7 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
         for e in examples:
 
             q_e_trunc = self.tokenizer.encode(e[0], max_length=self.max_seq_length, truncation=True)
-            q_tokens = [self.tokenizer._convert_id_to_token(tid) for tid in q_e_trunc]
+            # q_tokens = [self.tokenizer._convert_id_to_token(tid) for tid in q_e_trunc]
 
             c_e_trunc = self.tokenizer.encode(e[1], max_length=self.max_seq_length, truncation=True)
             c_tokens = [self.tokenizer._convert_id_to_token(tid) for tid in c_e_trunc]
@@ -73,7 +73,7 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
                 text_decoder_mlm_mask[i] = 1
                 text_matrix_attention_mask.append(text_decoder_mlm_mask)
 
-            input_ids_batch.append(torch.tensor(q_tokens))
+            input_ids_batch.append(torch.tensor(q_e_trunc))
             attention_mask_batch.append(torch.tensor([1] * len(q_e_trunc)))
 
             c_e_trunc[0] = -100
