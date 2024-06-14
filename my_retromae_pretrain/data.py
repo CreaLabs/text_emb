@@ -49,17 +49,19 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
     def __call__(self, examples):
         input_ids_batch = []
         attention_mask_batch = []
+        encoder_mlm_mask_batch = []
         decoder_labels_batch = []
         decoder_matrix_attention_mask_batch = []
 
         for e in examples:
+            q_e_trunc = self.tokenizer.encode(e['question'], max_length=self.max_seq_length, truncation=True)
+            q_tokens = [self.tokenizer._convert_id_to_token(tid) for tid in q_e_trunc]
 
-            q_e_trunc = self.tokenizer.encode(e[0], max_length=self.max_seq_length, truncation=True)
-            # q_tokens = [self.tokenizer._convert_id_to_token(tid) for tid in q_e_trunc]
-
-            c_e_trunc = self.tokenizer.encode(e[1], max_length=self.max_seq_length, truncation=True)
+            c_e_trunc = self.tokenizer.encode(e['answer'], max_length=self.max_seq_length, truncation=True)
             c_tokens = [self.tokenizer._convert_id_to_token(tid) for tid in c_e_trunc]
 
+            self.mlm_probability = self.encoder_mlm_probability
+            text_encoder_mlm_mask = self._whole_word_mask(q_tokens)
 
             self.mlm_probability = self.decoder_mlm_probability
             mask_set = []
@@ -75,23 +77,25 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
 
             input_ids_batch.append(torch.tensor(q_e_trunc))
             attention_mask_batch.append(torch.tensor([1] * len(q_e_trunc)))
-
             c_e_trunc[0] = -100
             c_e_trunc[-1] = -100
             decoder_labels_batch.append(torch.tensor(c_e_trunc))
 
+            encoder_mlm_mask_batch.append(torch.tensor(text_encoder_mlm_mask))
             decoder_matrix_attention_mask_batch.append(1 - torch.tensor(text_matrix_attention_mask))
 
         input_ids_batch = tensorize_batch(input_ids_batch, self.tokenizer.pad_token_id)
         attention_mask_batch = tensorize_batch(attention_mask_batch, 0)
         origin_input_ids_batch = input_ids_batch.clone()
-        encoder_input_ids_batch = input_ids_batch
+        encoder_mlm_mask_batch = tensorize_batch(encoder_mlm_mask_batch, 0)
+        encoder_input_ids_batch, encoder_labels_batch = self.torch_mask_tokens(input_ids_batch, encoder_mlm_mask_batch)
         decoder_labels_batch = tensorize_batch(decoder_labels_batch, -100)
         matrix_attention_mask_batch = tensorize_batch(decoder_matrix_attention_mask_batch, 0)
 
         batch = {
             "encoder_input_ids": encoder_input_ids_batch,
             "encoder_attention_mask": attention_mask_batch,
+            "encoder_labels": encoder_labels_batch,
             "decoder_input_ids": origin_input_ids_batch,
             "decoder_attention_mask": matrix_attention_mask_batch,  # [B,L,L]
             "decoder_labels": decoder_labels_batch,
