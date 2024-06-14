@@ -53,6 +53,8 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
         decoder_labels_batch = []
         decoder_matrix_attention_mask_batch = []
 
+        decoder_input_ids_batch = []
+
         for e in examples:
             q_e_trunc = self.tokenizer.encode(e['question'], max_length=self.max_seq_length, truncation=True)
             q_tokens = [self.tokenizer._convert_id_to_token(tid) for tid in q_e_trunc]
@@ -85,8 +87,12 @@ class RetroMAECollator(DataCollatorForWholeWordMask):
             decoder_matrix_attention_mask_batch.append(1 - torch.tensor(text_matrix_attention_mask))
 
         input_ids_batch = tensorize_batch(input_ids_batch, self.tokenizer.pad_token_id)
+
         attention_mask_batch = tensorize_batch(attention_mask_batch, 0)
-        origin_input_ids_batch = input_ids_batch.clone()
+
+        decoder_input_ids_batch.append(torch.tensor(c_e_trunc))
+        decoder_input_ids_batch = tensorize_batch(decoder_input_ids_batch, self.tokenizer.pad_token_id)
+        origin_input_ids_batch = decoder_input_ids_batch.clone()
         encoder_mlm_mask_batch = tensorize_batch(encoder_mlm_mask_batch, 0)
         encoder_input_ids_batch, encoder_labels_batch = self.torch_mask_tokens(input_ids_batch, encoder_mlm_mask_batch)
         decoder_labels_batch = tensorize_batch(decoder_labels_batch, -100)
