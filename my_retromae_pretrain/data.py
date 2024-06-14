@@ -19,6 +19,8 @@ class DatasetForPretraining(torch.utils.data.Dataset):
                 file = os.path.join(data_dir, file)
                 datasets.append(self.load_dataset(file))
             self.dataset = concatenate_datasets(datasets)
+        elif "/" in data_dir:
+            self.dataset = load_dataset(data_dir, split='train')
         else:
             print(f"Loading {data_dir}")
             self.dataset = self.load_dataset(data_dir)
