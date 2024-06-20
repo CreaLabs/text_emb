@@ -95,7 +95,7 @@ def check_languages(languages):
 
 
 def load_corpus(lang: str):    
-    corpus = datasets.load_dataset('miracl/miracl-corpus', lang, split='train')
+    corpus = datasets.load_dataset('miracl/miracl-corpus', lang, split='train', trust_remote_code=True)
     
     corpus_list = [{'id': e['docid'], 'content': e['text']} for e in tqdm(corpus, desc="Generating corpus")]
     corpus = datasets.Dataset.from_list(corpus_list)
