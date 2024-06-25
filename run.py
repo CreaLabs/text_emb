@@ -172,13 +172,10 @@ def main():
         passage_max_len=data_args.passage_max_len
     )
 
-    small_train_dataset = Subset(train_dataset, indices=list(range(2)))
-
     trainer = BiTrainer(
         model=model,
         args=training_args,
-        # train_dataset=train_dataset,
-        train_dataset=small_train_dataset,
+        train_dataset=train_dataset,
         data_collator=data_collator,
         tokenizer=tokenizer
     )
