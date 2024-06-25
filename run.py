@@ -224,7 +224,7 @@ def main():
     v_bias_grads = torch.stack(v_bias_grads_chunks, dim=0)
     v_bias_grads = v_bias_grads.flip(1)
 
-    with open('../BGE_M3/ko_finetune/data/grad/ko_grad.pkl', 'wb') as f:
+    with open('/data/grad/ko_grad.pkl', 'wb') as f:
         pickle.dump(
             {'q_weight_grads': q_weight_grads, 'k_weight_grads': k_weight_grads, 'v_weight_grads': v_weight_grads,
              'q_bias_grads': q_bias_grads, 'k_bias_grads': k_bias_grads, 'v_bias_grads': v_bias_grads}, f)
