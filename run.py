@@ -151,10 +151,10 @@ def main():
                 v.requires_grad = False
 
     # Register backward hooks to attention modules
-    # for layer_num, layer_module in enumerate(model.model.encoder.layer):
-    #     attention_module = layer_module.attention.self
-    #
-    #     attention_module.query.weight.register_hook(save_grad(q_weight_grads))
+    for layer_num, layer_module in enumerate(model.model.encoder.layer):
+        attention_module = layer_module.attention.self
+
+        attention_module.query.weight.register_hook(save_grad(q_weight_grads))
     #     attention_module.key.weight.register_hook(save_grad(k_weight_grads))
     #     attention_module.value.weight.register_hook(save_grad(v_weight_grads))
     #
@@ -197,12 +197,12 @@ def main():
     # print(f"===========================Rank {dist.get_rank()}: start training===========================")
     trainer.train()
 
-    # input_num = len(q_weight_grads) // 24
-    #
-    # q_weight_grads = torch.stack(q_weight_grads)
-    # q_weight_grads_chunks = torch.chunk(q_weight_grads, input_num, dim=0)
-    # q_weight_grads = torch.stack(q_weight_grads_chunks, dim=0)
-    # q_weight_grads = q_weight_grads.flip(1)
+    input_num = len(q_weight_grads) // 24
+
+    q_weight_grads = torch.stack(q_weight_grads)
+    q_weight_grads_chunks = torch.chunk(q_weight_grads, input_num, dim=0)
+    q_weight_grads = torch.stack(q_weight_grads_chunks, dim=0)
+    q_weight_grads = q_weight_grads.flip(1)
     #
     # k_weight_grads = torch.stack(k_weight_grads)
     # k_weight_grads_chunks = torch.chunk(k_weight_grads, input_num, dim=0)
@@ -233,6 +233,10 @@ def main():
     #     pickle.dump(
     #         {'q_weight_grads': q_weight_grads, 'k_weight_grads': k_weight_grads, 'v_weight_grads': v_weight_grads,
     #          'q_bias_grads': q_bias_grads, 'k_bias_grads': k_bias_grads, 'v_bias_grads': v_bias_grads}, f)
+
+    with open('/data/grad/ko_q_weight_grads.pkl', 'wb') as f:
+        pickle.dump(
+            {'q_weight_grads': q_weight_grads}, f)
 
     trainer.save_model()
     # For convenience, we also re-save the tokenizer to the same directory,
