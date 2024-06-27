@@ -143,16 +143,16 @@ def main():
                 v.requires_grad = False
 
     # Register backward hooks to attention modules
-    for layer_num, layer_module in enumerate(model.model.encoder.layer):
-        attention_module = layer_module.attention.self
-
-        attention_module.query.weight.register_hook(save_grad(q_weight_grads))
-        attention_module.key.weight.register_hook(save_grad(k_weight_grads))
-        attention_module.value.weight.register_hook(save_grad(v_weight_grads))
-
-        attention_module.query.bias.register_hook(save_grad(q_bias_grads))
-        attention_module.key.bias.register_hook(save_grad(k_bias_grads))
-        attention_module.value.bias.register_hook(save_grad(v_bias_grads))
+    # for layer_num, layer_module in enumerate(model.model.encoder.layer):
+    #     attention_module = layer_module.attention.self
+    #
+    #     attention_module.query.weight.register_hook(save_grad(q_weight_grads))
+    #     attention_module.key.weight.register_hook(save_grad(k_weight_grads))
+    #     attention_module.value.weight.register_hook(save_grad(v_weight_grads))
+    #
+    #     attention_module.query.bias.register_hook(save_grad(q_bias_grads))
+    #     attention_module.key.bias.register_hook(save_grad(k_bias_grads))
+    #     attention_module.value.bias.register_hook(save_grad(v_bias_grads))
 
         # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:
