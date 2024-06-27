@@ -123,7 +123,7 @@ def main():
 
     def save_grad(grad_list):
         def hook(grad):
-            grad_list.append(grad.cpu())
+            grad_list.append(grad))
 
         return hook
 
