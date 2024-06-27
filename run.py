@@ -189,42 +189,42 @@ def main():
     # print(f"===========================Rank {dist.get_rank()}: start training===========================")
     trainer.train()
 
-    input_num = len(q_weight_grads) // 24
-
-    q_weight_grads = torch.stack(q_weight_grads)
-    q_weight_grads_chunks = torch.chunk(q_weight_grads, input_num, dim=0)
-    q_weight_grads = torch.stack(q_weight_grads_chunks, dim=0)
-    q_weight_grads = q_weight_grads.flip(1)
-
-    k_weight_grads = torch.stack(k_weight_grads)
-    k_weight_grads_chunks = torch.chunk(k_weight_grads, input_num, dim=0)
-    k_weight_grads = torch.stack(k_weight_grads_chunks, dim=0)
-    k_weight_grads = k_weight_grads.flip(1)
-
-    v_weight_grads = torch.stack(v_weight_grads)
-    v_weight_grads_chunks = torch.chunk(v_weight_grads, input_num, dim=0)
-    v_weight_grads = torch.stack(v_weight_grads_chunks, dim=0)
-    v_weight_grads = v_weight_grads.flip(1)
-
-    q_bias_grads = torch.stack(q_bias_grads)
-    q_bias_grads_chunks = torch.chunk(q_bias_grads, input_num, dim=0)
-    q_bias_grads = torch.stack(q_bias_grads_chunks, dim=0)
-    q_bias_grads = q_bias_grads.flip(1)
-
-    k_bias_grads = torch.stack(k_bias_grads)
-    k_bias_grads_chunks = torch.chunk(k_bias_grads, input_num, dim=0)
-    k_bias_grads = torch.stack(k_bias_grads_chunks, dim=0)
-    k_bias_grads = k_bias_grads.flip(1)
-
-    v_bias_grads = torch.stack(v_bias_grads)
-    v_bias_grads_chunks = torch.chunk(v_bias_grads, input_num, dim=0)
-    v_bias_grads = torch.stack(v_bias_grads_chunks, dim=0)
-    v_bias_grads = v_bias_grads.flip(1)
-
-    with open('/data/grad/ko_grad.pkl', 'wb') as f:
-        pickle.dump(
-            {'q_weight_grads': q_weight_grads, 'k_weight_grads': k_weight_grads, 'v_weight_grads': v_weight_grads,
-             'q_bias_grads': q_bias_grads, 'k_bias_grads': k_bias_grads, 'v_bias_grads': v_bias_grads}, f)
+    # input_num = len(q_weight_grads) // 24
+    #
+    # q_weight_grads = torch.stack(q_weight_grads)
+    # q_weight_grads_chunks = torch.chunk(q_weight_grads, input_num, dim=0)
+    # q_weight_grads = torch.stack(q_weight_grads_chunks, dim=0)
+    # q_weight_grads = q_weight_grads.flip(1)
+    #
+    # k_weight_grads = torch.stack(k_weight_grads)
+    # k_weight_grads_chunks = torch.chunk(k_weight_grads, input_num, dim=0)
+    # k_weight_grads = torch.stack(k_weight_grads_chunks, dim=0)
+    # k_weight_grads = k_weight_grads.flip(1)
+    #
+    # v_weight_grads = torch.stack(v_weight_grads)
+    # v_weight_grads_chunks = torch.chunk(v_weight_grads, input_num, dim=0)
+    # v_weight_grads = torch.stack(v_weight_grads_chunks, dim=0)
+    # v_weight_grads = v_weight_grads.flip(1)
+    #
+    # q_bias_grads = torch.stack(q_bias_grads)
+    # q_bias_grads_chunks = torch.chunk(q_bias_grads, input_num, dim=0)
+    # q_bias_grads = torch.stack(q_bias_grads_chunks, dim=0)
+    # q_bias_grads = q_bias_grads.flip(1)
+    #
+    # k_bias_grads = torch.stack(k_bias_grads)
+    # k_bias_grads_chunks = torch.chunk(k_bias_grads, input_num, dim=0)
+    # k_bias_grads = torch.stack(k_bias_grads_chunks, dim=0)
+    # k_bias_grads = k_bias_grads.flip(1)
+    #
+    # v_bias_grads = torch.stack(v_bias_grads)
+    # v_bias_grads_chunks = torch.chunk(v_bias_grads, input_num, dim=0)
+    # v_bias_grads = torch.stack(v_bias_grads_chunks, dim=0)
+    # v_bias_grads = v_bias_grads.flip(1)
+    #
+    # with open('/data/grad/ko_grad.pkl', 'wb') as f:
+    #     pickle.dump(
+    #         {'q_weight_grads': q_weight_grads, 'k_weight_grads': k_weight_grads, 'v_weight_grads': v_weight_grads,
+    #          'q_bias_grads': q_bias_grads, 'k_bias_grads': k_bias_grads, 'v_bias_grads': v_bias_grads}, f)
 
     trainer.save_model()
     # For convenience, we also re-save the tokenizer to the same directory,
