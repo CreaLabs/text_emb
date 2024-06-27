@@ -42,11 +42,11 @@ class TrainerCallbackForDataRefresh(TrainerCallback):
 
 
 def main():
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12345'
-    os.environ['RANK'] = '0'
-    os.environ['WORLD_SIZE'] = '1'
-    dist.init_process_group(backend='gloo')
+    # os.environ['MASTER_ADDR'] = 'localhost'
+    # os.environ['MASTER_PORT'] = '12345'
+    # os.environ['RANK'] = '0'
+    # os.environ['WORLD_SIZE'] = '1'
+    # dist.init_process_group(backend='gloo')
 
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
