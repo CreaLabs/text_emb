@@ -105,6 +105,14 @@ def main():
                        colbert_dim=training_args.colbert_dim,
                        self_distill_start_step=training_args.self_distill_start_step, )
 
+    for k, v in model.named_parameters():
+        v.requires_grad = False
+
+    for k, v in model.named_parameters():
+        if "word_embeddings" in k:
+            logging.info(f"Train the parameters for {k}")
+            v.requires_grad = True
+
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
             if "position_embeddings" in k:
