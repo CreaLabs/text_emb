@@ -42,18 +42,6 @@ class TrainerCallbackForDataRefresh(TrainerCallback):
 
 
 def main():
-    # os.environ['MASTER_ADDR'] = 'localhost'
-    # os.environ['MASTER_PORT'] = '12345'
-    # os.environ['RANK'] = '0'
-    # os.environ['WORLD_SIZE'] = '1'
-    # dist.init_process_group(backend='gloo')
-
-    # os.environ['MASTER_ADDR'] = 'localhost'
-    # os.environ['MASTER_PORT'] = '12345'
-    # world_size = torch.cuda.device_count()
-    # os.environ['WORLD_SIZE'] = str(world_size)
-    # dist.init_process_group(backend='nccl')
-
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     model_args: ModelArguments
@@ -105,27 +93,6 @@ def main():
         cache_dir=model_args.cache_dir,
     )
     logger.info('Config: %s', config)
-    attention_head_grad = {}
-
-    def backward_hook(module, grad_input, grad_output):
-        if attention_head_grad.get(module.layer_index):
-            attention_head_grad[module.layer_index].append(grad_output)
-        else:
-            attention_head_grad[module.layer_index] = [grad_output]
-
-    q_weight_grads = []
-    k_weight_grads = []
-    v_weight_grads = []
-
-    q_bias_grads = []
-    k_bias_grads = []
-    v_bias_grads = []
-
-    def save_grad(grad_list):
-        def hook(grad):
-            grad_list.append(grad)
-
-        return hook
 
     model = BGEM3Model(model_name=model_args.model_name_or_path,
                        normlized=training_args.normlized,
@@ -150,17 +117,6 @@ def main():
             else:
                 v.requires_grad = False
 
-    # Register backward hooks to attention modules
-    for layer_num, layer_module in enumerate(model.model.encoder.layer):
-        attention_module = layer_module.attention.self
-
-        attention_module.query.weight.register_hook(save_grad(q_weight_grads))
-    #     attention_module.key.weight.register_hook(save_grad(k_weight_grads))
-    #     attention_module.value.weight.register_hook(save_grad(v_weight_grads))
-    #
-    #     attention_module.query.bias.register_hook(save_grad(q_bias_grads))
-    #     attention_module.key.bias.register_hook(save_grad(k_bias_grads))
-    #     attention_module.value.bias.register_hook(save_grad(v_bias_grads))
 
         # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:
@@ -196,47 +152,6 @@ def main():
     # Training
     # print(f"===========================Rank {dist.get_rank()}: start training===========================")
     trainer.train()
-
-    input_num = len(q_weight_grads) // 24
-
-    q_weight_grads = torch.stack(q_weight_grads)
-    q_weight_grads_chunks = torch.chunk(q_weight_grads, input_num, dim=0)
-    q_weight_grads = torch.stack(q_weight_grads_chunks, dim=0)
-    q_weight_grads = q_weight_grads.flip(1)
-    #
-    # k_weight_grads = torch.stack(k_weight_grads)
-    # k_weight_grads_chunks = torch.chunk(k_weight_grads, input_num, dim=0)
-    # k_weight_grads = torch.stack(k_weight_grads_chunks, dim=0)
-    # k_weight_grads = k_weight_grads.flip(1)
-    #
-    # v_weight_grads = torch.stack(v_weight_grads)
-    # v_weight_grads_chunks = torch.chunk(v_weight_grads, input_num, dim=0)
-    # v_weight_grads = torch.stack(v_weight_grads_chunks, dim=0)
-    # v_weight_grads = v_weight_grads.flip(1)
-    #
-    # q_bias_grads = torch.stack(q_bias_grads)
-    # q_bias_grads_chunks = torch.chunk(q_bias_grads, input_num, dim=0)
-    # q_bias_grads = torch.stack(q_bias_grads_chunks, dim=0)
-    # q_bias_grads = q_bias_grads.flip(1)
-    #
-    # k_bias_grads = torch.stack(k_bias_grads)
-    # k_bias_grads_chunks = torch.chunk(k_bias_grads, input_num, dim=0)
-    # k_bias_grads = torch.stack(k_bias_grads_chunks, dim=0)
-    # k_bias_grads = k_bias_grads.flip(1)
-    #
-    # v_bias_grads = torch.stack(v_bias_grads)
-    # v_bias_grads_chunks = torch.chunk(v_bias_grads, input_num, dim=0)
-    # v_bias_grads = torch.stack(v_bias_grads_chunks, dim=0)
-    # v_bias_grads = v_bias_grads.flip(1)
-    #
-    # with open('/data/grad/ko_grad.pkl', 'wb') as f:
-    #     pickle.dump(
-    #         {'q_weight_grads': q_weight_grads, 'k_weight_grads': k_weight_grads, 'v_weight_grads': v_weight_grads,
-    #          'q_bias_grads': q_bias_grads, 'k_bias_grads': k_bias_grads, 'v_bias_grads': v_bias_grads}, f)
-
-    with open('/data/grad/ko_q_weight_grads.pkl', 'wb') as f:
-        pickle.dump(
-            {'q_weight_grads': q_weight_grads}, f)
 
     trainer.save_model()
     # For convenience, we also re-save the tokenizer to the same directory,
