@@ -121,14 +121,6 @@ def main():
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
 
-    for k, v in model.named_parameters():
-        v.requires_grad = False
-
-    for k, v in model.named_parameters():
-        if "word_embeddings" in k:
-            logging.info(f"Train the parameters for {k}")
-            v.requires_grad = True
-
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
             if "position_embeddings" in k:
