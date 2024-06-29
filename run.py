@@ -21,11 +21,7 @@ from data import SameDatasetTrainDataset, EmbedCollator
 from modeling import BGEM3Model
 from trainer import BiTrainer
 
-import pickle
-
-from torch.utils.data import Subset
-
-import torch
+from peft import get_peft_model, LoraConfig, TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +38,17 @@ class TrainerCallbackForDataRefresh(TrainerCallback):
 
 
 def main():
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12345'
+    os.environ['RANK'] = '0'
+    os.environ['WORLD_SIZE'] = '1'
+    dist.init_process_group(backend='gloo')
+
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     model_args: ModelArguments
     data_args: DataArguments
     training_args: TrainingArguments
-
-
 
     if (
             os.path.exists(training_args.output_dir)
@@ -103,15 +103,31 @@ def main():
                        unified_finetuning=training_args.unified_finetuning,
                        use_self_distill=training_args.use_self_distill,
                        colbert_dim=training_args.colbert_dim,
-                       self_distill_start_step=training_args.self_distill_start_step, )
+                       self_distill_start_step=training_args.self_distill_start_step,
+                       config=config)
 
-    # for k, v in model.named_parameters():
-    #     v.requires_grad = False
-    #
-    # for k, v in model.named_parameters():
-    #     if "word_embeddings" in k:
-    #         logging.info(f"Train the parameters for {k}")
-    #         v.requires_grad = True
+    peft_config = LoraConfig(
+        inference_mode=False,
+        r=8,
+        lora_alpha=16,
+        lora_dropout=0.1,
+        target_modules=[
+            "query", "key", "value",
+            "intermediate.dense",
+            "output.dense",
+            "attention.output.dense"
+        ],
+    )
+    model = get_peft_model(model, peft_config)
+    model.print_trainable_parameters()
+
+    for k, v in model.named_parameters():
+        v.requires_grad = False
+
+    for k, v in model.named_parameters():
+        if "word_embeddings" in k:
+            logging.info(f"Train the parameters for {k}")
+            v.requires_grad = True
 
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
@@ -125,8 +141,7 @@ def main():
             else:
                 v.requires_grad = False
 
-
-        # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
+            # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:
         train_dataset = SameDatasetTrainDataset(args=data_args,
                                                 batch_size=training_args.per_device_train_batch_size,
@@ -144,10 +159,13 @@ def main():
         passage_max_len=data_args.passage_max_len
     )
 
+    # small_train_dataset = Subset(train_dataset, indices=list(range(2)))
+
     trainer = BiTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
+        # train_dataset=small_train_dataset,
         data_collator=data_collator,
         tokenizer=tokenizer
     )
@@ -161,7 +179,8 @@ def main():
     # print(f"===========================Rank {dist.get_rank()}: start training===========================")
     trainer.train()
 
-    trainer.save_model()
+    # trainer.save_model()
+    trainer.model.save_pretrained(training_args.output_dir)
     # For convenience, we also re-save the tokenizer to the same directory,
     # so that you can share your model easily on huggingface.co/models =)
     if trainer.is_world_process_zero():

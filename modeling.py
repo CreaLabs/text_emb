@@ -7,7 +7,7 @@ import torch
 import torch.distributed as dist
 from torch import nn, Tensor
 import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoConfig
 from transformers.file_utils import ModelOutput
 from huggingface_hub import snapshot_download
 
@@ -26,6 +26,7 @@ class BGEM3Model(nn.Module):
 
     def __init__(self,
                  model_name: str = None,
+                 config: AutoConfig = None,
                  normlized: bool = True,
                  sentence_pooling_method: str = 'cls',
                  negatives_cross_device: bool = False,
@@ -37,6 +38,7 @@ class BGEM3Model(nn.Module):
                  self_distill_start_step: int = -1,
                  ):
         super().__init__()
+        self.config = config
         self.load_model(model_name, colbert_dim=colbert_dim)
         self.vocab_size = self.model.config.vocab_size
         self.cross_entropy = nn.CrossEntropyLoss(reduction='mean')
