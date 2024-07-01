@@ -118,8 +118,8 @@ def main():
             "attention.output.dense"
         ],
     )
-    model = get_peft_model(model, peft_config)
-    model.print_trainable_parameters()
+    model.model = get_peft_model(model.model, peft_config)
+    model.model.print_trainable_parameters()
 
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
