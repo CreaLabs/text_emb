@@ -79,7 +79,7 @@ def get_model(model_args: ModelArgs):
 
 
 def load_qa_corpus():
-    with open('/data/makeData/law_qa_data.json', 'r', encoding='utf-8') as f:
+    with open('/data/text_emb_train_data/makeData/law_qa_data.json', 'r', encoding='utf-8') as f:
         corpus = json.load(f)
 
     corpus_list = [{'id': e['url'].split('caseId')[-1].split('&')[0].replace('=', ''), 'content': e['answer']} for e in tqdm(corpus, desc="Generating corpus")]
@@ -87,7 +87,7 @@ def load_qa_corpus():
     return corpus
 
 def load_cyber_qa_corpus():
-    with open('/data/makeData/cyber_law_qa_data_2_pre.json', 'r', encoding='utf-8') as f:
+    with open('/data/text_emb_train_data/makeData/cyber_law_qa_data_2_pre.json', 'r', encoding='utf-8') as f:
         corpus = json.load(f)
 
     corpus_list = [{'id': e['url'].split('contentId')[-1].split('&')[0].replace('=', ''), 'content': e['answer']} for e in tqdm(corpus, desc="Generating corpus")]
@@ -96,13 +96,13 @@ def load_cyber_qa_corpus():
 
 
 def load_all_qa_corpus():
-    with open('/data/makeData/cyber_law_qa_data_2_pre.json', 'r', encoding='utf-8') as f:
+    with open('/data/text_emb_train_data/makeData/cyber_law_qa_data_2_pre.json', 'r', encoding='utf-8') as f:
         cyber_2_corpus = json.load(f)
 
-    with open('/data/makeData/cyber_law_qa_data_pre.json', 'r', encoding='utf-8') as f:
+    with open('/data/text_emb_train_data/makeData/cyber_law_qa_data_pre.json', 'r', encoding='utf-8') as f:
         cyber_corpus = json.load(f)
 
-    with open('/data/makeData/law_qa_data.json', 'r', encoding='utf-8') as f:
+    with open('/data/text_emb_train_data/makeData/law_qa_data.json', 'r', encoding='utf-8') as f:
         qa_corpus = json.load(f)
 
     corpus_list = []
