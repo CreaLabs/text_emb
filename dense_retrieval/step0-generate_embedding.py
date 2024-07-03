@@ -1,7 +1,6 @@
 """
 python step0-generate_embedding.py
 --encoder BAAI/bge-m3
---languages ko
 --index_save_dir ./corpus-index
 --max_passage_length 8192
 --batch_size 4
@@ -9,15 +8,7 @@ python step0-generate_embedding.py
 --pooling_method cls
 --normalize_embeddings True
 
-python step0-generate_embedding.py
---encoder D:\bgm_m3_finetune\cut_10
---languages ko
---index_save_dir ./corpus-index
---max_passage_length 8192
---batch_size 4
---fp16
---pooling_method cls
---normalize_embeddings True
+--encoder D:\bgm_m3_finetune\checkpoint-500
 """
 import os
 import faiss
@@ -28,7 +19,9 @@ from utils.flag_models import FlagModel
 from dataclasses import dataclass, field
 from transformers import HfArgumentParser
 
+import json
 
+from sentence_transformers import SentenceTransformer
 @dataclass
 class ModelArgs:
     encoder: str = field(
@@ -53,7 +46,7 @@ class ModelArgs:
 class EvalArgs:
     languages: str = field(
         default="en",
-        metadata={'help': 'Languages to evaluate. Avaliable languages: ar de en es fr hi it ja ko pt ru th zh', 
+        metadata={'help': 'Languages to evaluate. Avaliable languages: ar de en es fr hi it ja ko pt ru th zh',
                   "nargs": "+"}
     )
     index_save_dir: str = field(
@@ -76,7 +69,7 @@ class EvalArgs:
 
 def get_model(model_args: ModelArgs):
     model = FlagModel(
-        model_args.encoder, 
+        model_args.encoder,
         pooling_method=model_args.pooling_method,
         normalize_embeddings=model_args.normalize_embeddings,
         use_fp16=model_args.fp16
@@ -84,34 +77,69 @@ def get_model(model_args: ModelArgs):
     return model
 
 
-def check_languages(languages):
-    if isinstance(languages, str):
-        languages = [languages]
-    avaliable_languages = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'zh']
-    for lang in languages:
-        if lang not in avaliable_languages:
-            raise ValueError(f"Language `{lang}` is not supported. Avaliable languages: {avaliable_languages}")
-    return languages
 
+def load_qa_corpus():
+    with open('/data/makeData/law_qa_data.json', 'r', encoding='utf-8') as f:
+        corpus = json.load(f)
 
-def load_corpus(lang: str):    
-    corpus = datasets.load_dataset('miracl/miracl-corpus', lang, split='train', trust_remote_code=True)
-    
-    corpus_list = [{'id': e['docid'], 'content': e['text']} for e in tqdm(corpus, desc="Generating corpus")]
+    corpus_list = [{'id': e['url'].split('caseId')[-1].split('&')[0].replace('=', ''), 'content': e['answer']} for e in tqdm(corpus, desc="Generating corpus")]
+    corpus = datasets.Dataset.from_list(corpus_list)
+    return corpus
+
+def load_cyber_qa_corpus():
+    with open('/data/makeData/cyber_law_qa_data_2_pre.json', 'r', encoding='utf-8') as f:
+        corpus = json.load(f)
+
+    corpus_list = [{'id': e['url'].split('contentId')[-1].split('&')[0].replace('=', ''), 'content': e['answer']} for e in tqdm(corpus, desc="Generating corpus")]
     corpus = datasets.Dataset.from_list(corpus_list)
     return corpus
 
 
+def load_all_qa_corpus():
+    with open('/data/makeData/cyber_law_qa_data_2_pre.json', 'r', encoding='utf-8') as f:
+        cyber_2_corpus = json.load(f)
+
+    with open('/data/makeData/cyber_law_qa_data_pre.json', 'r', encoding='utf-8') as f:
+        cyber_corpus = json.load(f)
+
+    with open('/data/makeData/law_qa_data.json', 'r', encoding='utf-8') as f:
+        qa_corpus = json.load(f)
+
+    corpus_list = []
+
+    for e in tqdm(cyber_2_corpus, desc="Generating corpus cyber_2"):
+        corpus_list.append(
+            {'id': e['url'].split('contentId')[-1].split('&')[0].replace('=', ''), 'content': e['answer']})
+
+    for e in tqdm(cyber_corpus, desc="Generating corpus cyber"):
+        corpus_list.append(
+            {'id': e['url'].split('contentId')[-1].split('&')[0].replace('=', ''), 'content': e['answer']})
+
+    for e in tqdm(qa_corpus, desc="Generating corpus"):
+        corpus_list.append({'id': e['url'].split('caseId')[-1].split('&')[0].replace('=', ''), 'content': e['answer']})
+
+    corpus = datasets.Dataset.from_list(corpus_list)
+    return corpus
+
 def generate_index(model: FlagModel, corpus: datasets.Dataset, max_passage_length: int=512, batch_size: int=256):
     corpus_embeddings = model.encode_corpus(corpus["content"], batch_size=batch_size, max_length=max_passage_length)
     dim = corpus_embeddings.shape[-1]
-    
+
     faiss_index = faiss.index_factory(dim, "Flat", faiss.METRIC_INNER_PRODUCT)
     corpus_embeddings = corpus_embeddings.astype(np.float32)
     faiss_index.train(corpus_embeddings)
     faiss_index.add(corpus_embeddings)
     return faiss_index, list(corpus["id"])
 
+def generate_index_sentence_transformers(model: SentenceTransformer, corpus: datasets.Dataset, batch_size: int = 256, normalize_embeddings:bool = True):
+    corpus_embeddings = model.encode(corpus["content"], batch_size=batch_size, normalize_embeddings=normalize_embeddings, show_progress_bar=True)
+    dim = corpus_embeddings.shape[-1]
+
+    faiss_index = faiss.index_factory(dim, "Flat", faiss.METRIC_INNER_PRODUCT)
+    corpus_embeddings = corpus_embeddings.astype(np.float32)
+    faiss_index.train(corpus_embeddings)
+    faiss_index.add(corpus_embeddings)
+    return faiss_index, list(corpus["id"])
 
 def save_result(index: faiss.Index, docid: list, index_save_dir: str):
     docid_save_path = os.path.join(index_save_dir, 'docid')
@@ -127,42 +155,46 @@ def main():
     model_args, eval_args = parser.parse_args_into_dataclasses()
     model_args: ModelArgs
     eval_args: EvalArgs
-    
-    languages = check_languages(eval_args.languages)
-    
+
     if model_args.encoder[-1] == '/':
         model_args.encoder = model_args.encoder[:-1]
-    
-    model = get_model(model_args=model_args)
-    
+
+    if model_args.encoder == 'bespin-global/klue-sroberta-base-continue-learning-by-mnr':
+        model = SentenceTransformer("bespin-global/klue-sroberta-base-continue-learning-by-mnr")
+    else:
+        model = get_model(model_args=model_args)
+
     encoder = model_args.encoder
     if os.path.basename(encoder).startswith('checkpoint-'):
         encoder = os.path.dirname(encoder) + '_' + os.path.basename(encoder)
-    
+
     print("==================================================")
     print("Start generating embedding with model:")
     print(model_args.encoder)
 
-    print('Generate embedding of following languages: ', languages)
-    for lang in languages:
-        print("**************************************************")
-        index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), lang)
-        if not os.path.exists(index_save_dir):
-            os.makedirs(index_save_dir)
-        if os.path.exists(os.path.join(index_save_dir, 'index')) and not eval_args.overwrite:
-            print(f'Embedding of {lang} already exists. Skip...')
-            continue
-        
-        print(f"Start generating embedding of {lang} ...")
-        corpus = load_corpus(lang)
-        
+    print("**************************************************")
+    index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), 'cyber_law_qa_2')
+    if not os.path.exists(index_save_dir):
+        os.makedirs(index_save_dir)
+    # corpus = load_qa_corpus()
+    corpus = load_all_qa_corpus()
+
+    if model_args.encoder == 'bespin-global/klue-sroberta-base-continue-learning-by-mnr':
+        index, docid = generate_index_sentence_transformers(
+            model=model,
+            corpus=corpus,
+            batch_size=eval_args.batch_size,
+            normalize_embeddings=model_args.normalize_embeddings,
+        )
+    else:
         index, docid = generate_index(
-            model=model, 
+            model=model,
             corpus=corpus,
             max_passage_length=eval_args.max_passage_length,
             batch_size=eval_args.batch_size
         )
-        save_result(index, docid, index_save_dir)
+
+    save_result(index, docid, index_save_dir)
 
     print("==================================================")
     print("Finish generating embeddings with model:")
