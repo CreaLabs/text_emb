@@ -21,8 +21,6 @@ from data import SameDatasetTrainDataset, EmbedCollator
 from modeling import BGEM3Model
 from trainer import BiTrainer
 
-from peft import get_peft_model, LoraConfig, TaskType
-
 logger = logging.getLogger(__name__)
 
 
