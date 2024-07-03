@@ -173,7 +173,7 @@ def main():
     print(model_args.encoder)
 
     print("**************************************************")
-    index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), 'cyber_law_qa_2')
+    index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), 'all_law_qa')
     if not os.path.exists(index_save_dir):
         os.makedirs(index_save_dir)
     # corpus = load_qa_corpus()
