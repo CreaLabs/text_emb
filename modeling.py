@@ -68,6 +68,12 @@ class BGEM3Model(nn.Module):
             self.process_rank = dist.get_rank()
             self.world_size = dist.get_world_size()
 
+        self.adapter = nn.Sequential(
+            nn.Linear(config.hidden_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, config.hidden_size)
+        )
+
     def load_model(self, model_name, colbert_dim: int = -1):
         if not os.path.exists(model_name):
             cache_folder = os.getenv('HF_HUB_CACHE')
@@ -146,6 +152,7 @@ class BGEM3Model(nn.Module):
     def _encode(self, features):
         dense_vecs, sparse_vecs, colbert_vecs = None, None, None
         last_hidden_state = self.model(**features, return_dict=True).last_hidden_state
+        last_hidden_state = self.adapter(last_hidden_state)
         dense_vecs = self.dense_embedding(last_hidden_state, features['attention_mask'])
         if self.unified_finetuning:
             sparse_vecs = self.sparse_embedding(last_hidden_state, features['input_ids'])
@@ -386,19 +393,3 @@ class BGEM3ForInference(BGEM3Model):
                 output['colbert_vecs'] = torch.nn.functional.normalize(output['colbert_vecs'], dim=-1)
 
         return output
-
-class ClassificationHead(nn.Module):
-    def __init__(self, input_dim, num_labels, dropout_prob=0.1):
-        super().__init__()
-        self.dense = nn.Linear(input_dim, input_dim)
-        self.dropout = nn.Dropout(dropout_prob)
-        self.out_proj = nn.Linear(input_dim, num_labels)
-
-    def forward(self, hidden_state):
-        x = hidden_state[:, 0]
-        x = self.dropout(x)
-        x = self.dense(x)
-        x = torch.tanh(x)
-        x = self.dropout(x)
-        x = self.out_proj(x)
-        return x
