@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer, AutoConfig
 from transformers.file_utils import ModelOutput
 from huggingface_hub import snapshot_download
-
+from transformers import XLMRobertaConfig, XLMRobertaModel
 logger = logging.getLogger(__name__)
 
 
@@ -126,6 +126,11 @@ class BGEM3Model(nn.Module):
         scores = scores.view(q_reps.size(0), -1)
         return scores
 
+    def neg_q_dense_score(self, q_reps, p_reps):
+        scores = self.compute_similarity(q_reps, p_reps) / self.temperature
+        scores = torch.diag(scores)  # 대각 행렬 추출
+        return scores
+
     def sparse_score(self, q_reps, p_reps):
         scores = self.compute_similarity(q_reps, p_reps) / self.temperature
         scores = scores.view(q_reps.size(0), -1)
@@ -208,16 +213,22 @@ class BGEM3Model(nn.Module):
         return loss
 
     def forward(self, query: Dict[str, Tensor] = None, passage: Dict[str, Tensor] = None, teacher_scores: Tensor = None,
-                bi_directions=None):
+                bi_directions=None, neg_q: Dict[str, Tensor] = None):
         if self.enable_sub_batch:
             q_dense_vecs, q_sparse_vecs, q_colbert_vecs = self.encode(query,
                                                                       sub_batch_size=self.compute_sub_batch_size(query))
             p_dense_vecs, p_sparse_vecs, p_colbert_vecs = self.encode(passage,
                                                                       sub_batch_size=self.compute_sub_batch_size(
                                                                           passage))
+            if neg_q:
+                neg_q_dense_vecs, neg_q_sparse_vecs, neg_q_colbert_vecs = self.encode(neg_q,
+                                                                          sub_batch_size=self.compute_sub_batch_size(
+                                                                              passage))
         else:
             q_dense_vecs, q_sparse_vecs, q_colbert_vecs = self.encode(query)
             p_dense_vecs, p_sparse_vecs, p_colbert_vecs = self.encode(passage)
+            if neg_q:
+                neg_q_dense_vecs, neg_q_sparse_vecs, neg_q_colbert_vecs = self.encode(neg_q)
 
         if self.training:
             if teacher_scores is not None:
@@ -294,6 +305,10 @@ class BGEM3Model(nn.Module):
                     torch.sum(torch.log_softmax(colbert_scores, dim=-1) * teacher_targets, dim=-1))
                 loss += (ensemble_distill_dense_loss + 0.1 * ensemble_distill_sparse_loss + ensemble_distill_colbert_loss) / 3
                 loss = loss / 2
+            if neg_q:
+                neg_q_sim  = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
+                neg_q_loss = (1 - neg_q_sim).mean()
+                loss += 0.1 * neg_q_loss
             self.step += 1
         else:
             loss = None
@@ -371,3 +386,19 @@ class BGEM3ForInference(BGEM3Model):
                 output['colbert_vecs'] = torch.nn.functional.normalize(output['colbert_vecs'], dim=-1)
 
         return output
+
+class ClassificationHead(nn.Module):
+    def __init__(self, input_dim, num_labels, dropout_prob=0.1):
+        super().__init__()
+        self.dense = nn.Linear(input_dim, input_dim)
+        self.dropout = nn.Dropout(dropout_prob)
+        self.out_proj = nn.Linear(input_dim, num_labels)
+
+    def forward(self, hidden_state):
+        x = hidden_state[:, 0]
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
