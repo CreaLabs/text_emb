@@ -347,9 +347,9 @@ class BGEM3Model(nn.Module):
                  v in state_dict.items()})
             return state_dict
 
-        # self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(self.model.state_dict()))
+        self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(self.model.state_dict()))
         torch.save(_trans_state_dict(self.adapter.state_dict()),  os.path.join(output_dir, 'adapter_weights.pt'))
-        self.config.save_pretrained(output_dir)
+        # self.config.save_pretrained(output_dir)
         # if self.unified_finetuning:
         #     torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
         #                os.path.join(output_dir, 'colbert_linear.pt'))
