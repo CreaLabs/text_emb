@@ -68,11 +68,11 @@ class BGEM3Model(nn.Module):
             self.process_rank = dist.get_rank()
             self.world_size = dist.get_world_size()
 
-        self.adapter = nn.Sequential(
-            nn.Linear(config.hidden_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, config.hidden_size)
-        )
+        # self.adapter = nn.Sequential(
+        #     nn.Linear(config.hidden_size, 512),
+        #     nn.ReLU(),
+        #     nn.Linear(512, config.hidden_size)
+        # )
 
     def load_model(self, model_name, colbert_dim: int = -1):
         if not os.path.exists(model_name):
@@ -152,7 +152,7 @@ class BGEM3Model(nn.Module):
     def _encode(self, features):
         dense_vecs, sparse_vecs, colbert_vecs = None, None, None
         last_hidden_state = self.model(**features, return_dict=True).last_hidden_state
-        last_hidden_state = self.adapter(last_hidden_state)
+        # last_hidden_state = self.adapter(last_hidden_state)
         dense_vecs = self.dense_embedding(last_hidden_state, features['attention_mask'])
         if self.unified_finetuning:
             sparse_vecs = self.sparse_embedding(last_hidden_state, features['input_ids'])
@@ -348,13 +348,14 @@ class BGEM3Model(nn.Module):
             return state_dict
 
         self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(self.model.state_dict()))
-        torch.save(_trans_state_dict(self.adapter.state_dict()),  os.path.join(output_dir, 'adapter_weights.pt'))
-        # self.config.save_pretrained(output_dir)
-        # if self.unified_finetuning:
-        #     torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
-        #                os.path.join(output_dir, 'colbert_linear.pt'))
-        #     torch.save(_trans_state_dict(self.sparse_linear.state_dict()),
-        #                os.path.join(output_dir, 'sparse_linear.pt'))
+
+        # torch.save(_trans_state_dict(self.adapter.state_dict()),  os.path.join(output_dir, 'adapter_weights.pt'))
+
+        if self.unified_finetuning:
+            torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
+                       os.path.join(output_dir, 'colbert_linear.pt'))
+            torch.save(_trans_state_dict(self.sparse_linear.state_dict()),
+                       os.path.join(output_dir, 'sparse_linear.pt'))
 
     def load_pooler(self, model_dir):
         colbert_state_dict = torch.load(os.path.join(model_dir, 'colbert_linear.pt'), map_location='cpu')
