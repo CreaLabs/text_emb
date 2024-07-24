@@ -313,9 +313,9 @@ class BGEM3Model(nn.Module):
                 loss += (ensemble_distill_dense_loss + 0.1 * ensemble_distill_sparse_loss + ensemble_distill_colbert_loss) / 3
                 loss = loss / 2
             if neg_q:
-                neg_q_sim  = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
+                neg_q_sim = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
                 neg_q_loss = (1 - neg_q_sim).mean()
-                loss += 0.1 * neg_q_loss
+                loss += 0.5 * neg_q_loss
             self.step += 1
         else:
             loss = None
