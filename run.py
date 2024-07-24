@@ -131,11 +131,11 @@ def main():
             else:
                 v.requires_grad = False
 
-    # for k, v in model.named_parameters():
-    #     if "pooler" in k:
-    #         logging.info(f"train the parameters for {k}")
-    #     else:
-    #         v.requires_grad = False
+    for k, v in model.named_parameters():
+        if "pooler" in k:
+            logging.info(f"train the parameters for {k}")
+        else:
+            v.requires_grad = False
 
             # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:
