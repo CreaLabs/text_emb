@@ -132,7 +132,7 @@ def main():
                 v.requires_grad = False
 
     for k, v in model.named_parameters():
-        if "pooler" in k:
+        if "output" in k:
             logging.info(f"train the parameters for {k}")
         else:
             v.requires_grad = False
