@@ -315,7 +315,8 @@ class BGEM3Model(nn.Module):
             if neg_q:
                 neg_q_sim = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
                 neg_q_loss = (1 - neg_q_sim).mean()
-                loss += 0.5 * neg_q_loss
+                ratio = 0.2
+                loss = loss * (1 - ratio) + neg_q_loss * ratio
             self.step += 1
         else:
             loss = None
