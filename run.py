@@ -132,7 +132,7 @@ def main():
                 v.requires_grad = False
 
     for k, v in model.named_parameters():
-        if "output" in k:
+        if "intermediate" in k:
             logging.info(f"train the parameters for {k}")
         else:
             v.requires_grad = False
