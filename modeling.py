@@ -10,6 +10,9 @@ import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer, AutoConfig
 from transformers.file_utils import ModelOutput
 from huggingface_hub import snapshot_download
+from typing import List
+from simple_parsing.helpers import Serializable
+import copy
 from transformers import XLMRobertaConfig, XLMRobertaModel
 logger = logging.getLogger(__name__)
 
@@ -82,6 +85,15 @@ class BGEM3Model(nn.Module):
                                            ignore_patterns=['flax_model.msgpack', 'rust_model.ot', 'tf_model.h5'])
 
         self.model = AutoModel.from_pretrained(model_name)
+        num_experts = 4
+        MoeArgs.num_experts = num_experts
+        MoeArgs.num_experts_per_tok = 2
+        for layer in self.model.encoder.layer:
+            layer.intermediate.dense = MoeLayer(
+                experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(num_experts)],
+                gate=nn.Linear(layer.intermediate.dense.in_features, num_experts, bias=False),
+                moe_args=MoeArgs,
+            )
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self.colbert_linear = torch.nn.Linear(in_features=self.model.config.hidden_size,
@@ -152,7 +164,9 @@ class BGEM3Model(nn.Module):
     def _encode(self, features):
         dense_vecs, sparse_vecs, colbert_vecs = None, None, None
         last_hidden_state = self.model(**features, return_dict=True).last_hidden_state
+
         # last_hidden_state = self.adapter(last_hidden_state)
+
         dense_vecs = self.dense_embedding(last_hidden_state, features['attention_mask'])
         if self.unified_finetuning:
             sparse_vecs = self.sparse_embedding(last_hidden_state, features['input_ids'])
@@ -313,10 +327,9 @@ class BGEM3Model(nn.Module):
                 loss += (ensemble_distill_dense_loss + 0.1 * ensemble_distill_sparse_loss + ensemble_distill_colbert_loss) / 3
                 loss = loss / 2
             if neg_q:
-                neg_q_sim = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
+                neg_q_sim  = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
                 neg_q_loss = (1 - neg_q_sim).mean()
-                ratio = 0.2
-                loss = loss * (1 - ratio) + neg_q_loss * ratio
+                loss += 0.1 * neg_q_loss
             self.step += 1
         else:
             loss = None
@@ -348,15 +361,14 @@ class BGEM3Model(nn.Module):
                  v in state_dict.items()})
             return state_dict
 
-        self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(self.model.state_dict()))
-
+        # self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(self.model.state_dict()))
         # torch.save(_trans_state_dict(self.adapter.state_dict()),  os.path.join(output_dir, 'adapter_weights.pt'))
-
-        if self.unified_finetuning:
-            torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
-                       os.path.join(output_dir, 'colbert_linear.pt'))
-            torch.save(_trans_state_dict(self.sparse_linear.state_dict()),
-                       os.path.join(output_dir, 'sparse_linear.pt'))
+        self.config.save_pretrained(output_dir)
+        # if self.unified_finetuning:
+        #     torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
+        #                os.path.join(output_dir, 'colbert_linear.pt'))
+        #     torch.save(_trans_state_dict(self.sparse_linear.state_dict()),
+        #                os.path.join(output_dir, 'sparse_linear.pt'))
 
     def load_pooler(self, model_dir):
         colbert_state_dict = torch.load(os.path.join(model_dir, 'colbert_linear.pt'), map_location='cpu')
@@ -364,6 +376,33 @@ class BGEM3Model(nn.Module):
         self.colbert_linear.load_state_dict(colbert_state_dict)
         self.sparse_linear.load_state_dict(sparse_state_dict)
 
+@dataclass
+class MoeArgs(Serializable):
+    num_experts: int
+    num_experts_per_tok: int
+
+class MoeLayer(nn.Module):
+    def __init__(self, experts: List[nn.Module], gate: nn.Module, moe_args: MoeArgs):
+        super().__init__()
+        assert len(experts) > 0
+        self.experts = nn.ModuleList(experts)
+        self.gate = gate
+        self.args = moe_args
+
+    def forward(self, inputs: torch.Tensor):
+        #입력에 어떤 전문가가 적당한지를 계산
+        gate_logits = self.gate(inputs)
+        #가장 높은 점수를 받은 전문가 num_experts_per_tok만큼 선택
+        weights, selected_experts = torch.topk(gate_logits, self.args.num_experts_per_tok)
+        #선택된 전문가에 대한 가중치를 softmax 함수를 통해 정규화
+        weights = F.softmax(weights, dim=2, dtype=torch.float).to(inputs.dtype)
+        results = torch.zeros(inputs.size(0), inputs.size(1), 4096, device=inputs.device, dtype=inputs.dtype)
+        for i, expert in enumerate(self.experts):
+            batch_idx, nth_token, nth_expert = torch.where(selected_experts == i)
+            results[batch_idx, nth_token] += weights[batch_idx, nth_token, nth_expert, None] * expert(
+                inputs[batch_idx, nth_token]
+            )
+        return results
 
 class BGEM3ForInference(BGEM3Model):
 
