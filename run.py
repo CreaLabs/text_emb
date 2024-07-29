@@ -20,6 +20,7 @@ from arguments import ModelArguments, DataArguments, \
 from data import SameDatasetTrainDataset, EmbedCollator
 from modeling import BGEM3Model
 from trainer import BiTrainer
+from torch.utils.data import Subset
 
 logger = logging.getLogger(__name__)
 
@@ -155,13 +156,13 @@ def main():
         passage_max_len=data_args.passage_max_len
     )
 
-    # small_train_dataset = Subset(train_dataset, indices=list(range(2)))
+    small_train_dataset = Subset(train_dataset, indices=list(range(2)))
 
     trainer = BiTrainer(
         model=model,
         args=training_args,
-        train_dataset=train_dataset,
-        # train_dataset=small_train_dataset,
+        # train_dataset=train_dataset,
+        train_dataset=small_train_dataset,
         data_collator=data_collator,
         tokenizer=tokenizer
     )
