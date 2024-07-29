@@ -13,6 +13,7 @@ from huggingface_hub import snapshot_download
 from typing import List
 from simple_parsing.helpers import Serializable
 import copy
+import pickle
 from transformers import XLMRobertaConfig, XLMRobertaModel
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,10 @@ class BGEM3Model(nn.Module):
                  ):
         super().__init__()
         self.config = config
+
+        self.num_experts = 4
+        self.num_experts_per_tok = 2
+
         self.load_model(model_name, colbert_dim=colbert_dim)
         self.vocab_size = self.model.config.vocab_size
         self.cross_entropy = nn.CrossEntropyLoss(reduction='mean')
@@ -85,14 +90,12 @@ class BGEM3Model(nn.Module):
                                            ignore_patterns=['flax_model.msgpack', 'rust_model.ot', 'tf_model.h5'])
 
         self.model = AutoModel.from_pretrained(model_name)
-        num_experts = 4
-        MoeArgs.num_experts = num_experts
-        MoeArgs.num_experts_per_tok = 2
+        moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok)
         for layer in self.model.encoder.layer:
             layer.intermediate.dense = MoeLayer(
-                experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(num_experts)],
-                gate=nn.Linear(layer.intermediate.dense.in_features, num_experts, bias=False),
-                moe_args=MoeArgs,
+                experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(self.num_experts)],
+                gate=torch.nn.Linear(layer.intermediate.dense.in_features, self.num_experts, bias=False),
+                moe_args=moe_args,
             )
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -365,19 +368,18 @@ class BGEM3Model(nn.Module):
         config.update({
             "num_experts": self.num_experts,
             "num_experts_per_tok": self.num_experts_per_tok,
-            "architectures": ["XLMRobertaModel", "MoEModel"]
+            "architectures": ["XLMRobertaModel", "MoEModel"]  # 모델 아키텍처 정보 추가 (선택 사항)
         })
         config.save_pretrained(output_dir)
 
         moe_state_dict = self.model.state_dict()
-        self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(moe_state_dict))
+        self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(moe_state_dict))  # MoE 가중치 저장
 
         if self.unified_finetuning:
             torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
                        os.path.join(output_dir, 'colbert_linear.pt'))
             torch.save(_trans_state_dict(self.sparse_linear.state_dict()),
                        os.path.join(output_dir, 'sparse_linear.pt'))
-
 
     def load_pooler(self, model_dir):
         colbert_state_dict = torch.load(os.path.join(model_dir, 'colbert_linear.pt'), map_location='cpu')
