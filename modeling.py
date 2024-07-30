@@ -90,13 +90,13 @@ class BGEM3Model(nn.Module):
                                            ignore_patterns=['flax_model.msgpack', 'rust_model.ot', 'tf_model.h5'])
 
         self.model = AutoModel.from_pretrained(model_name)
-        moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok)
-        for layer in self.model.encoder.layer:
-            layer.intermediate.dense = MoeLayer(
-                experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(self.num_experts)],
-                gate=torch.nn.Linear(layer.intermediate.dense.in_features, self.num_experts, bias=False),
-                moe_args=moe_args,
-            )
+        # moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok)
+        # for layer in self.model.encoder.layer:
+        #     layer.intermediate.dense = MoeLayer(
+        #         experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(self.num_experts)],
+        #         gate=torch.nn.Linear(layer.intermediate.dense.in_features, self.num_experts, bias=False),
+        #         moe_args=moe_args,
+        #     )
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self.colbert_linear = torch.nn.Linear(in_features=self.model.config.hidden_size,
