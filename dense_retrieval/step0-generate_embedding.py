@@ -1,7 +1,7 @@
 """
 python step0-generate_embedding.py
 --encoder BAAI/bge-m3
---languages ko
+--languages en
 --index_save_dir ./corpus-index
 --max_passage_length 8192
 --batch_size 4
@@ -27,7 +27,7 @@ from tqdm import tqdm
 from utils.flag_models import FlagModel
 from dataclasses import dataclass, field
 from transformers import HfArgumentParser
-
+import json
 
 @dataclass
 class ModelArgs:
@@ -95,10 +95,16 @@ def check_languages(languages):
 
 
 def load_corpus(lang: str):
-    corpus = datasets.load_dataset('miracl/miracl-corpus', lang, trust_remote_code=True)['train']
-    # corpus = datasets.load_dataset('miracl/miracl-corpus', lang, split='train', trust_remote_code=True)
+    corpus = datasets.load_dataset('miracl/miracl-corpus', lang, split='train', trust_remote_code=True)
+    corpus_list = []
+    corpus_dic = {}
+    for e in tqdm(corpus, desc="Generating corpus"):
+        corpus_list.append({'id': e['docid'], 'content': e['text']})
+        corpus_dic[e['docid']] = e['text']
+    with open(f'/data/{lang}_corpus.json', 'w', encoding='utf-8') as f:
+        json.dump(corpus_dic, f, ensure_ascii=False, indent=4)
 
-    corpus_list = [{'id': e['docid'], 'content': e['text']} for e in tqdm(corpus, desc="Generating corpus")]
+    # corpus_list = [{'id': e['docid'], 'content': e['text']} for e in tqdm(corpus, desc="Generating corpus")]
     corpus = datasets.Dataset.from_list(corpus_list)
     return corpus
 
