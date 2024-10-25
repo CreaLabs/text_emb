@@ -103,7 +103,7 @@ def check_languages(languages):
 
 
 def get_queries_and_qids(lang: str, split: str='dev', add_instruction: bool=False, query_instruction_for_retrieval: str=None):
-    dataset = datasets.load_dataset('miracl/miracl', lang, split=split)
+    dataset = datasets.load_dataset('miracl/miracl', lang, split=split, trust_remote_code=True)
     
     queries = []
     qids = []
