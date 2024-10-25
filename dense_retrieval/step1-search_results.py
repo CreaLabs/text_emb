@@ -1,33 +1,28 @@
 """
 python step1-search_results.py
---encoder D:\bgm_m3_finetune\medical_dispute
-
-python step1-search_results.py
---encoder bespin-global/klue-sroberta-base-continue-learning-by-mnr
-
-python step1-search_results.py
 --encoder BAAI/bge-m3
+
+python step1-search_results.py
+--encoder D:\bgm_m3_finetune\law_qa_dataset_only_output
+--languages ko
 --index_save_dir ./corpus-index
 --result_save_dir ./search_results
---threads 4
---hits 20
+--threads 16
+--hits 1000
 --pooling_method cls
 --normalize_embeddings True
 --add_instruction False
-
-
 """
 import os
 import torch
+import datasets
 from pprint import pprint
 from dataclasses import dataclass, field
 from transformers import HfArgumentParser, is_torch_npu_available
 from pyserini.search.faiss import FaissSearcher, AutoQueryEncoder
 from pyserini.output_writer import get_output_writer, OutputFormat
 
-import json
 
-from torch import nn
 @dataclass
 class ModelArgs:
     encoder: str = field(
@@ -96,19 +91,27 @@ def get_query_encoder(model_args: ModelArgs):
     )
     return model
 
-def get_qa_legal_dataset_queries_and_qids(split: str = 'dev'):
-    with open(f'/data/text_emb_train_data/qa_legal_dataset_{split}.json', 'r', encoding='utf-8') as f:
-        dataset = json.load(f)
 
+def check_languages(languages):
+    if isinstance(languages, str):
+        languages = [languages]
+    avaliable_languages = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'zh']
+    for lang in languages:
+        if lang not in avaliable_languages:
+            raise ValueError(f"Language `{lang}` is not supported. Avaliable languages: {avaliable_languages}")
+    return languages
+
+
+def get_queries_and_qids(lang: str, split: str='dev', add_instruction: bool=False, query_instruction_for_retrieval: str=None):
+    dataset = datasets.load_dataset('miracl/miracl', lang, split=split)
+    
     queries = []
     qids = []
-
-    # datasetLen = len(dataset)
-    # chunkNum = 0
-    # for data in dataset[datasetLen // 10 * chunkNum : datasetLen // 10 * (chunkNum + 1)]:
-    for data in dataset:
-        qids.append(str(data['id']))
-        queries.append(str(data['Question']))
+    for i, qid in enumerate(dataset['query_id']):
+        qids.append(str(qid))
+        queries.append(str(dataset[i]['query']))
+    if add_instruction and query_instruction_for_retrieval is not None:
+        queries = [f"{query_instruction_for_retrieval}{query}" for query in queries]
     return queries, qids
 
 
@@ -128,12 +131,14 @@ def main():
     model_args, eval_args = parser.parse_args_into_dataclasses()
     model_args: ModelArgs
     eval_args: EvalArgs
-
+    
+    languages = check_languages(eval_args.languages)
+    
     if model_args.encoder[-1] == '/':
         model_args.encoder = model_args.encoder[:-1]
     
     query_encoder = get_query_encoder(model_args=model_args)
-
+    
     encoder = model_args.encoder
     if os.path.basename(encoder).startswith('checkpoint-'):
         encoder = os.path.dirname(encoder) + '_' + os.path.basename(encoder)
@@ -142,38 +147,49 @@ def main():
     print("Start generating search results with model:")
     print(model_args.encoder)
 
-    print("**************************************************")
+    print('Generate search results of following languages: ', languages)
+    for lang in languages:
+        print("**************************************************")
+        print(f"Start searching results of {lang} ...")
+        
+        result_save_path = os.path.join(eval_args.result_save_dir, os.path.basename(encoder), f"{lang}.txt")
+        if not os.path.exists(os.path.dirname(result_save_path)):
+            os.makedirs(os.path.dirname(result_save_path))
+        
+        if os.path.exists(result_save_path) and not eval_args.overwrite:
+            print(f'Search results of {lang} already exists. Skip...')
+            continue
+        
+        index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), lang)
+        if not os.path.exists(index_save_dir):
+            raise FileNotFoundError(f"{index_save_dir} not found")
 
-    result_save_path = os.path.join(eval_args.result_save_dir, os.path.basename(encoder), f"qa_legal_dataset.txt")
-    if not os.path.exists(os.path.dirname(result_save_path)):
-        os.makedirs(os.path.dirname(result_save_path))
+        queries, qids = get_queries_and_qids(
+            lang=lang,
+            split='train',
+            add_instruction=model_args.add_instruction,
+            query_instruction_for_retrieval=model_args.query_instruction_for_retrieval
+        )
 
-    index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), 'qa_legal_dataset')
-    if not os.path.exists(index_save_dir):
-        raise FileNotFoundError(f"{index_save_dir} not found")
-    searcher = FaissSearcher(
-        index_dir=index_save_dir,
-        query_encoder=query_encoder
-    )
-
-    queries, qids = get_qa_legal_dataset_queries_and_qids(
-        split='train'
-    )
-
-    search_results = searcher.batch_search(
-        queries=queries,
-        q_ids=qids,
-        k=eval_args.hits,
-        threads=eval_args.threads
-    )
-    search_results = [(_id, search_results[_id]) for _id in qids]
-
-    save_result(
-        search_results=search_results,
-        result_save_path=result_save_path,
-        qids=qids,
-        max_hits=eval_args.hits
-    )
+        searcher = FaissSearcher(
+            index_dir=index_save_dir,
+            query_encoder=query_encoder
+        )
+        
+        search_results = searcher.batch_search(
+            queries=queries,
+            q_ids=qids,
+            k=eval_args.hits,
+            threads=eval_args.threads
+        )
+        search_results = [(_id, search_results[_id]) for _id in qids]
+        
+        save_result(
+            search_results=search_results,
+            result_save_path=result_save_path, 
+            qids=qids, 
+            max_hits=eval_args.hits
+        )
 
     print("==================================================")
     print("Finish generating search results with model:")
