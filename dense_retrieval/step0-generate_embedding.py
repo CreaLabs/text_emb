@@ -53,7 +53,7 @@ class ModelArgs:
 class EvalArgs:
     languages: str = field(
         default="en",
-        metadata={'help': 'Languages to evaluate. Avaliable languages: ar de en es fr hi it ja ko pt ru th zh',
+        metadata={'help': 'Languages to evaluate. Avaliable languages: ar de en es fr hi it ja ko pt ru th zh fa',
                   "nargs": "+"}
     )
     index_save_dir: str = field(
@@ -87,7 +87,7 @@ def get_model(model_args: ModelArgs):
 def check_languages(languages):
     if isinstance(languages, str):
         languages = [languages]
-    avaliable_languages = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'zh']
+    avaliable_languages = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'zh', 'fa']
     for lang in languages:
         if lang not in avaliable_languages:
             raise ValueError(f"Language `{lang}` is not supported. Avaliable languages: {avaliable_languages}")
