@@ -20,7 +20,12 @@ from arguments import ModelArguments, DataArguments, \
 from data import SameDatasetTrainDataset, EmbedCollator
 from modeling import BGEM3Model
 from trainer import BiTrainer
+
+import torch
+from transformers.trainer_callback import TrainerCallback
 from torch.utils.data import Subset
+
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,11 @@ class TrainerCallbackForDataRefresh(TrainerCallback):
         """
         self.train_dataset.refresh_epoch()
 
+
+# pip install sentencepiece
+# pip install --upgrade accelerate
+# pip install --upgrade wandb
+# python run.py --output_dir /root/paper/train_result/zh_base --model_name_or_path BAAI/bge-m3 --train_data /root/paper/train_data --learning_rate 1e-5 --fp16 y --num_train_epochs 1 --per_device_train_batch_size 1 --gradient_accumulation_steps 4 --dataloader_drop_last True --normlized True --temperature 0.02 --query_max_len 128 --passage_max_len 512 --train_group_size 5 --logging_steps 10 --same_task_within_batch True --unified_finetuning False --use_self_distill False --save_steps 10000000
 
 def main():
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -105,21 +115,6 @@ def main():
                        self_distill_start_step=training_args.self_distill_start_step,
                        config=config)
 
-    # peft_config = LoraConfig(
-    #     inference_mode=False,
-    #     r=8,
-    #     lora_alpha=16,
-    #     lora_dropout=0.1,
-    #     target_modules=[
-    #         "query", "key", "value",
-    #         "intermediate.dense",
-    #         "output.dense",
-    #         "attention.output.dense"
-    #     ],
-    # )
-    # model.model = get_peft_model(model.model, peft_config)
-    # model.model.print_trainable_parameters()
-
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
             if "position_embeddings" in k:
@@ -132,13 +127,22 @@ def main():
             else:
                 v.requires_grad = False
 
+    # model.encoder.layer.0.output.dense
+    # model.encoder.layer.1.attention.output.dense
+    # model.encoder.layer.0.intermediate.dense
+
+    # pattern1 = r'^model\.encoder\.layer\.(\d+)\.intermediate\.dense\..*$'
+    # pattern2 = r'^model\.encoder\.layer\.(\d+)\.output\.dense\..*$'
+
     # for k, v in model.named_parameters():
-    #     if "intermediate" in k:
+    #     match1 = re.match(pattern1, k)
+    #     match2 = re.match(pattern2, k)
+    #     if match1:
     #         logging.info(f"train the parameters for {k}")
     #     else:
     #         v.requires_grad = False
 
-            # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
+    # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:
         train_dataset = SameDatasetTrainDataset(args=data_args,
                                                 batch_size=training_args.per_device_train_batch_size,

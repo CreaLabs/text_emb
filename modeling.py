@@ -15,6 +15,7 @@ from simple_parsing.helpers import Serializable
 import copy
 import pickle
 from transformers import XLMRobertaConfig, XLMRobertaModel
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,8 +45,8 @@ class BGEM3Model(nn.Module):
         super().__init__()
         self.config = config
 
-        self.num_experts = 4
-        self.num_experts_per_tok = 2
+        self.num_experts = 2
+        self.num_experts_per_tok = 1
 
         self.load_model(model_name, colbert_dim=colbert_dim)
         self.vocab_size = self.model.config.vocab_size
@@ -97,6 +98,7 @@ class BGEM3Model(nn.Module):
         #         gate=torch.nn.Linear(layer.intermediate.dense.in_features, self.num_experts, bias=False),
         #         moe_args=moe_args,
         #     )
+        print("moe 미적용")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self.colbert_linear = torch.nn.Linear(in_features=self.model.config.hidden_size,
@@ -246,8 +248,8 @@ class BGEM3Model(nn.Module):
                                                                           passage))
             if neg_q:
                 neg_q_dense_vecs, neg_q_sparse_vecs, neg_q_colbert_vecs = self.encode(neg_q,
-                                                                          sub_batch_size=self.compute_sub_batch_size(
-                                                                              passage))
+                                                                                      sub_batch_size=self.compute_sub_batch_size(
+                                                                                          passage))
         else:
             q_dense_vecs, q_sparse_vecs, q_colbert_vecs = self.encode(query)
             p_dense_vecs, p_sparse_vecs, p_colbert_vecs = self.encode(passage)
@@ -297,7 +299,8 @@ class BGEM3Model(nn.Module):
                     cross_q_dense_vecs = self._dist_gather_tensor(q_dense_vecs)
                     cross_p_dense_vecs = self._dist_gather_tensor(p_dense_vecs)
 
-                    cross_idxs = torch.arange(cross_q_dense_vecs.size(0), device=cross_q_dense_vecs.device, dtype=torch.long)
+                    cross_idxs = torch.arange(cross_q_dense_vecs.size(0), device=cross_q_dense_vecs.device,
+                                              dtype=torch.long)
 
                     cross_targets = cross_idxs * (cross_p_dense_vecs.size(0) // cross_q_dense_vecs.size(0))
                     cross_dense_scores = self.dense_score(cross_q_dense_vecs, cross_p_dense_vecs)
@@ -327,10 +330,11 @@ class BGEM3Model(nn.Module):
                     torch.sum(torch.log_softmax(sparse_scores, dim=-1) * teacher_targets, dim=-1))
                 ensemble_distill_colbert_loss = - torch.mean(
                     torch.sum(torch.log_softmax(colbert_scores, dim=-1) * teacher_targets, dim=-1))
-                loss += (ensemble_distill_dense_loss + 0.1 * ensemble_distill_sparse_loss + ensemble_distill_colbert_loss) / 3
+                loss += (
+                                    ensemble_distill_dense_loss + 0.1 * ensemble_distill_sparse_loss + ensemble_distill_colbert_loss) / 3
                 loss = loss / 2
             if neg_q:
-                neg_q_sim  = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
+                neg_q_sim = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
                 neg_q_loss = (1 - neg_q_sim).mean()
                 loss += 0.1 * neg_q_loss
             self.step += 1
@@ -364,6 +368,15 @@ class BGEM3Model(nn.Module):
                  v in state_dict.items()})
             return state_dict
 
+        # self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(self.model.state_dict()))
+
+        # if self.unified_finetuning:
+        #     torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
+        #                os.path.join(output_dir, 'colbert_linear.pt'))
+        #     torch.save(_trans_state_dict(self.sparse_linear.state_dict()),
+        #                os.path.join(output_dir, 'sparse_linear.pt'))
+
+        # moe
         config = self.model.config
         config.update({
             "num_experts": self.num_experts,
@@ -375,6 +388,7 @@ class BGEM3Model(nn.Module):
         moe_state_dict = self.model.state_dict()
         self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(moe_state_dict))  # MoE 가중치 저장
 
+        # 4. 추가적인 선형 레이어 저장 (기존 코드 유지)
         if self.unified_finetuning:
             torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
                        os.path.join(output_dir, 'colbert_linear.pt'))
@@ -387,10 +401,12 @@ class BGEM3Model(nn.Module):
         self.colbert_linear.load_state_dict(colbert_state_dict)
         self.sparse_linear.load_state_dict(sparse_state_dict)
 
+
 @dataclass
 class MoeArgs(Serializable):
     num_experts: int
     num_experts_per_tok: int
+
 
 class MoeLayer(nn.Module):
     def __init__(self, experts: List[nn.Module], gate: nn.Module, moe_args: MoeArgs):
@@ -401,11 +417,11 @@ class MoeLayer(nn.Module):
         self.args = moe_args
 
     def forward(self, inputs: torch.Tensor):
-        #입력에 어떤 전문가가 적당한지를 계산
+        # 입력에 어떤 전문가가 적당한지를 계산
         gate_logits = self.gate(inputs)
-        #가장 높은 점수를 받은 전문가 num_experts_per_tok만큼 선택
+        # 가장 높은 점수를 받은 전문가 num_experts_per_tok만큼 선택
         weights, selected_experts = torch.topk(gate_logits, self.args.num_experts_per_tok)
-        #선택된 전문가에 대한 가중치를 softmax 함수를 통해 정규화
+        # 선택된 전문가에 대한 가중치를 softmax 함수를 통해 정규화
         weights = F.softmax(weights, dim=2, dtype=torch.float).to(inputs.dtype)
         results = torch.zeros(inputs.size(0), inputs.size(1), 4096, device=inputs.device, dtype=inputs.dtype)
         for i, expert in enumerate(self.experts):
@@ -414,6 +430,7 @@ class MoeLayer(nn.Module):
                 inputs[batch_idx, nth_token]
             )
         return results
+
 
 class BGEM3ForInference(BGEM3Model):
 
