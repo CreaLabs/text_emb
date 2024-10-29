@@ -166,7 +166,7 @@ def main():
 
         queries, qids = get_queries_and_qids(
             lang=lang,
-            split='train',
+            split='dev',
             add_instruction=model_args.add_instruction,
             query_instruction_for_retrieval=model_args.query_instruction_for_retrieval
         )
