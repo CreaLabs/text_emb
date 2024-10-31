@@ -45,8 +45,8 @@ class BGEM3Model(nn.Module):
         super().__init__()
         self.config = config
 
-        self.num_experts = 4
-        self.num_experts_per_tok = 2
+        self.num_experts = 2
+        self.num_experts_per_tok = 1
 
         self.load_model(model_name, colbert_dim=colbert_dim)
         self.vocab_size = self.model.config.vocab_size
@@ -336,7 +336,8 @@ class BGEM3Model(nn.Module):
             if neg_q:
                 neg_q_sim = F.cosine_similarity(neg_q_dense_vecs, p_dense_vecs[1:], dim=-1)
                 neg_q_loss = (1 - neg_q_sim).mean()
-                loss += 0.1 * neg_q_loss
+                lambda_func = 0.1
+                loss = loss * (1 - lambda_func) + lambda_func * neg_q_loss
             self.step += 1
         else:
             loss = None

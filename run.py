@@ -131,16 +131,16 @@ def main():
     # model.encoder.layer.1.attention.output.dense
     # model.encoder.layer.0.intermediate.dense
 
-    pattern1 = r'^model\.encoder\.layer\.(\d+)\.intermediate\.dense\..*$'
-    pattern2 = r'^model\.encoder\.layer\.(\d+)\.output\.dense\..*$'
-
-    for k, v in model.named_parameters():
-        match1 = re.match(pattern1, k)
-        match2 = re.match(pattern2, k)
-        if match2:
-            logging.info(f"train the parameters for {k}")
-        else:
-            v.requires_grad = False
+    # pattern1 = r'^model\.encoder\.layer\.(\d+)\.intermediate\.dense\..*$'
+    # pattern2 = r'^model\.encoder\.layer\.(\d+)\.output\.dense\..*$'
+    #
+    # for k, v in model.named_parameters():
+    #     match1 = re.match(pattern1, k)
+    #     match2 = re.match(pattern2, k)
+    #     if match2:
+    #         logging.info(f"train the parameters for {k}")
+    #     else:
+    #         v.requires_grad = False
 
     # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:
