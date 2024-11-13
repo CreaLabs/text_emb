@@ -137,7 +137,7 @@ def main():
     for k, v in model.named_parameters():
         match1 = re.match(pattern1, k)
         match2 = re.match(pattern2, k)
-        if match1:
+        if match2:
             logging.info(f"train the parameters for {k}")
         else:
             v.requires_grad = False
