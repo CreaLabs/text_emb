@@ -24,7 +24,7 @@ import faiss
 import datasets
 import numpy as np
 from tqdm import tqdm
-from utils.flag_models import FlagModel
+from flag_models import FlagModel
 from dataclasses import dataclass, field
 from transformers import HfArgumentParser
 import json

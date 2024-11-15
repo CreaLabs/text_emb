@@ -19,7 +19,7 @@ import datasets
 from pprint import pprint
 from dataclasses import dataclass, field
 from transformers import HfArgumentParser, is_torch_npu_available
-from pyserini.search.faiss import FaissSearcher, AutoQueryEncoder
+from _searcher import FaissSearcher, AutoQueryEncoder
 from pyserini.output_writer import get_output_writer, OutputFormat
 
 
