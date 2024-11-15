@@ -93,9 +93,9 @@ class BGEM3Model(nn.Module):
         self.model = AutoModel.from_pretrained(model_name)
         moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok)
         for layer in self.model.encoder.layer:
-            layer.intermediate.dense = MoeLayer(
-                experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(self.num_experts)],
-                gate=torch.nn.Linear(layer.intermediate.dense.in_features, self.num_experts, bias=False),
+            layer.output.dense = MoeLayer(
+                experts=[copy.deepcopy(layer.output.dense) for _ in range(self.num_experts)],
+                gate=torch.nn.Linear(layer.output.dense.in_features, self.num_experts, bias=False),
                 moe_args=moe_args,
             )
         print("moe 적용")
@@ -424,7 +424,8 @@ class MoeLayer(nn.Module):
         weights, selected_experts = torch.topk(gate_logits, self.args.num_experts_per_tok)
         # 선택된 전문가에 대한 가중치를 softmax 함수를 통해 정규화
         weights = F.softmax(weights, dim=2, dtype=torch.float).to(inputs.dtype)
-        results = torch.zeros(inputs.size(0), inputs.size(1), 4096, device=inputs.device, dtype=inputs.dtype)
+        #1024 4096
+        results = torch.zeros(inputs.size(0), inputs.size(1), 1024, device=inputs.device, dtype=inputs.dtype)
         for i, expert in enumerate(self.experts):
             batch_idx, nth_token, nth_expert = torch.where(selected_experts == i)
             results[batch_idx, nth_token] += weights[batch_idx, nth_token, nth_expert, None] * expert(
