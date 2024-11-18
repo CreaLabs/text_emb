@@ -353,8 +353,8 @@ class FlagModel:
         # self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-m3')
         self.model = AutoModel.from_pretrained(model_name_or_path)
-        self.moe(model_name_or_path)
-        print("moe 적용")
+        # self.moe(model_name_or_path)
+        print("moe 미적용")
         self.query_instruction_for_retrieval = query_instruction_for_retrieval
         self.normalize_embeddings = normalize_embeddings
         self.pooling_method = pooling_method
