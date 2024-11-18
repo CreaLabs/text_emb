@@ -101,8 +101,8 @@ def load_corpus(lang: str):
     for e in tqdm(corpus, desc="Generating corpus"):
         corpus_list.append({'id': e['docid'], 'content': e['text']})
         corpus_dic[e['docid']] = e['text']
-    with open(f'/data/{lang}_corpus.json', 'w', encoding='utf-8') as f:
-        json.dump(corpus_dic, f, ensure_ascii=False, indent=4)
+    # with open(f'/data/{lang}_corpus.json', 'w', encoding='utf-8') as f:
+    #     json.dump(corpus_dic, f, ensure_ascii=False, indent=4)
 
     # corpus_list = [{'id': e['docid'], 'content': e['text']} for e in tqdm(corpus, desc="Generating corpus")]
     corpus = datasets.Dataset.from_list(corpus_list)
