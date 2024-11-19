@@ -376,8 +376,8 @@ class AutoQueryEncoder(QueryEncoder):
         if encoder_dir:
             self.device = device
             self.model = AutoModel.from_pretrained(encoder_dir)
-            self.moe(encoder_dir)
-            print("moe 적용")
+            # self.moe(encoder_dir)
+            print("moe 미적용")
             self.model.to(self.device)
             try:
                 self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name or encoder_dir)
