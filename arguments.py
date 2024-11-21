@@ -23,9 +23,9 @@ class ModelArguments:
     cache_dir: Optional[str] = field(
         default=None, metadata={"help": "Where do you want to store the pretrained models downloaded from s3"}
     )
-    moe: bool = field(
-        default=False,
-        metadata={'help': "moe"}
+    moe: Optional[str] = field(
+        default=None,
+        metadata={'help': "intermediate or output"}
     )
     only_train: Optional[str] = field(
         default=None, metadata={"help": "Only intermediate or output layers are trained"}

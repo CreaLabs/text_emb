@@ -84,7 +84,7 @@ class BGEM3Model(nn.Module):
         #     nn.Linear(512, config.hidden_size)
         # )
 
-    def load_model(self, model_name, colbert_dim: int = -1, moe: bool = False):
+    def load_model(self, model_name, colbert_dim: int = -1, moe: str = ''):
         if not os.path.exists(model_name):
             cache_folder = os.getenv('HF_HUB_CACHE')
             model_name = snapshot_download(repo_id=model_name,
@@ -93,16 +93,24 @@ class BGEM3Model(nn.Module):
 
         self.model = AutoModel.from_pretrained(model_name)
         if moe:
-            moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok)
+            moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok, moe)
             for layer in self.model.encoder.layer:
-                layer.output.dense = MoeLayer(
-                    experts=[copy.deepcopy(layer.output.dense) for _ in range(self.num_experts)],
-                    gate=torch.nn.Linear(layer.output.dense.in_features, self.num_experts, bias=False),
-                    moe_args=moe_args,
-                )
-            print("moe 적용")
+                if moe == 'output':
+                    layer.output.dense = MoeLayer(
+                        experts=[copy.deepcopy(layer.output.dense) for _ in range(self.num_experts)],
+                        gate=torch.nn.Linear(layer.output.dense.in_features, self.num_experts, bias=False),
+                        moe_args=moe_args,
+                    )
+                    print("moe output")
+                elif moe == 'intermediate':
+                    layer.intermediate.dense = MoeLayer(
+                        experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(self.num_experts)],
+                        gate=torch.nn.Linear(layer.intermediate.dense.in_features, self.num_experts, bias=False),
+                        moe_args=moe_args,
+                    )
+                    print("moe intermediate")
         else:
-            print("moe 미적용")
+            print("not moe")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self.colbert_linear = torch.nn.Linear(in_features=self.model.config.hidden_size,
@@ -421,15 +429,19 @@ class MoeLayer(nn.Module):
         self.gate = gate
         self.args = moe_args
 
-    def forward(self, inputs: torch.Tensor):
+    def forward(self, inputs: torch.Tensor, moe):
         # 입력에 어떤 전문가가 적당한지를 계산
         gate_logits = self.gate(inputs)
         # 가장 높은 점수를 받은 전문가 num_experts_per_tok만큼 선택
         weights, selected_experts = torch.topk(gate_logits, self.args.num_experts_per_tok)
         # 선택된 전문가에 대한 가중치를 softmax 함수를 통해 정규화
         weights = F.softmax(weights, dim=2, dtype=torch.float).to(inputs.dtype)
-        #1024 4096
-        results = torch.zeros(inputs.size(0), inputs.size(1), 1024, device=inputs.device, dtype=inputs.dtype)
+
+        if moe == 'output':
+            results = torch.zeros(inputs.size(0), inputs.size(1), 1024, device=inputs.device, dtype=inputs.dtype)
+        elif moe == 'intermediate':
+            results = torch.zeros(inputs.size(0), inputs.size(1), 4096, device=inputs.device, dtype=inputs.dtype)
+
         for i, expert in enumerate(self.experts):
             batch_idx, nth_token, nth_expert = torch.where(selected_experts == i)
             results[batch_idx, nth_token] += weights[batch_idx, nth_token, nth_expert, None] * expert(
