@@ -315,6 +315,7 @@ import copy
 class MoeArgs(Serializable):
     num_experts: int
     num_experts_per_tok: int
+    moe: str
 
 class MoeLayer(nn.Module):
     def __init__(self, experts: List[nn.Module], gate: nn.Module, moe_args: MoeArgs):
@@ -331,8 +332,12 @@ class MoeLayer(nn.Module):
         weights, selected_experts = torch.topk(gate_logits, self.args.num_experts_per_tok)
         #선택된 전문가에 대한 가중치를 softmax 함수를 통해 정규화
         weights = F.softmax(weights, dim=2, dtype=torch.float).to(inputs.dtype)
-        #output 1024 inter 4096
-        results = torch.zeros(inputs.size(0), inputs.size(1), 1024, device=inputs.device, dtype=inputs.dtype)
+
+        if self.args.moe == 'output':
+            results = torch.zeros(inputs.size(0), inputs.size(1), 1024, device=inputs.device, dtype=inputs.dtype)
+        elif self.args.moe == 'intermediate':
+            results = torch.zeros(inputs.size(0), inputs.size(1), 4096, device=inputs.device, dtype=inputs.dtype)
+
         for i, expert in enumerate(self.experts):
             batch_idx, nth_token, nth_expert = torch.where(selected_experts == i)
             results[batch_idx, nth_token] += weights[batch_idx, nth_token, nth_expert, None] * expert(
@@ -355,10 +360,9 @@ class FlagModel:
         self.tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-m3')
         self.model = AutoModel.from_pretrained(model_name_or_path)
         if moe:
-            self.moe(model_name_or_path)
-            print("moe 적용")
+            self.moe(model_name_or_path, moe)
         else:
-            print("moe 미적용")
+            print("moe not")
         self.query_instruction_for_retrieval = query_instruction_for_retrieval
         self.normalize_embeddings = normalize_embeddings
         self.pooling_method = pooling_method
@@ -379,25 +383,31 @@ class FlagModel:
         if self.num_gpus > 1:
             print(f"----------using {self.num_gpus}*GPUs----------")
             self.model = torch.nn.DataParallel(self.model)
-    def moe(self, model_name_or_path):
+    def moe(self, model_name_or_path, moe):
         state_dict = load_file(os.path.join(model_name_or_path, "model.safetensors"))
-        moe_args = MoeArgs(self.model.config.num_experts, self.model.config.num_experts_per_tok)
+        moe_args = MoeArgs(self.model.config.num_experts, self.model.config.num_experts_per_tok, moe)
         for i, layer in enumerate(self.model.encoder.layer):
-            # MoE 레이어 생성
-            layer.output.dense = MoeLayer(
-                experts=[copy.deepcopy(layer.output.dense) for _ in range(moe_args.num_experts)],
-                gate=torch.nn.Linear(layer.output.dense.in_features, moe_args.num_experts, bias=False),
-                moe_args=moe_args,
-            )
-            # 각 전문가 모델에 해당하는 가중치 로드
+            if moe == 'intermediate':
+                layer.intermediate.dense = MoeLayer(
+                    experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(moe_args.num_experts)],
+                    gate=torch.nn.Linear(layer.intermediate.dense.in_features, moe_args.num_experts, bias=False),
+                    moe_args=moe_args,
+                )
+            elif moe == 'output':
+                layer.output.dense = MoeLayer(
+                    experts=[copy.deepcopy(layer.output.dense) for _ in range(moe_args.num_experts)],
+                    gate=torch.nn.Linear(layer.output.dense.in_features, moe_args.num_experts, bias=False),
+                    moe_args=moe_args,
+                )
+
             for j in range(moe_args.num_experts):
-                expert_key = f"encoder.layer.{i}.output.dense.experts.{j}."
+                expert_key = f"encoder.layer.{i}.{moe}.dense.experts.{j}."
                 expert_state_dict = {k.replace(expert_key, ""): v for k, v in state_dict.items() if
                                      k.startswith(expert_key)}
                 layer.output.dense.experts[j].load_state_dict(expert_state_dict)
 
             # 게이트 네트워크 가중치 로드
-            gate_key = f"encoder.layer.{i}.output.dense.gate."
+            gate_key = f"encoder.layer.{i}.{moe}.dense.gate."
             gate_state_dict = {k.replace(gate_key, ""): v for k, v in state_dict.items() if k.startswith(gate_key)}
             layer.output.dense.gate.load_state_dict(gate_state_dict)
 

@@ -47,9 +47,9 @@ class ModelArgs:
         default=True,
         metadata={'help': "Normalize embeddings or not"}
     )
-    moe: bool = field(
-        default=False,
-        metadata={'help': "moe"}
+    moe: str = field(
+        default=None,
+        metadata={'help': "intermediate or output"}
     )
 
 
