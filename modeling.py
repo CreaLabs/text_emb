@@ -419,6 +419,7 @@ class BGEM3Model(nn.Module):
 class MoeArgs(Serializable):
     num_experts: int
     num_experts_per_tok: int
+    moe: str
 
 
 class MoeLayer(nn.Module):
@@ -437,9 +438,9 @@ class MoeLayer(nn.Module):
         # 선택된 전문가에 대한 가중치를 softmax 함수를 통해 정규화
         weights = F.softmax(weights, dim=2, dtype=torch.float).to(inputs.dtype)
 
-        if moe == 'output':
+        if self.args.moe == 'output':
             results = torch.zeros(inputs.size(0), inputs.size(1), 1024, device=inputs.device, dtype=inputs.dtype)
-        elif moe == 'intermediate':
+        elif self.args.moe == 'intermediate':
             results = torch.zeros(inputs.size(0), inputs.size(1), 4096, device=inputs.device, dtype=inputs.dtype)
 
         for i, expert in enumerate(self.experts):
