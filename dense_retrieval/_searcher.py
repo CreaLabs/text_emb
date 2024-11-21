@@ -374,12 +374,18 @@ class AutoQueryEncoder(QueryEncoder):
                 expert_key = f"encoder.layer.{i}.{moe}.dense.experts.{j}."
                 expert_state_dict = {k.replace(expert_key, ""): v for k, v in state_dict.items() if
                                      k.startswith(expert_key)}
-                layer.output.dense.experts[j].load_state_dict(expert_state_dict)
+                if moe == 'intermediate':
+                    layer.intermediate.dense.experts[j].load_state_dict(expert_state_dict)
+                elif moe == 'output':
+                    layer.output.dense.experts[j].load_state_dict(expert_state_dict)
 
-                # 게이트 네트워크 가중치 로드
+
             gate_key = f"encoder.layer.{i}.{moe}.dense.gate."
             gate_state_dict = {k.replace(gate_key, ""): v for k, v in state_dict.items() if k.startswith(gate_key)}
-            layer.output.dense.gate.load_state_dict(gate_state_dict)
+            if moe == 'intermediate':
+                layer.intermediate.dense.gate.load_state_dict(gate_state_dict)
+            elif moe == 'output':
+                layer.output.dense.gate.load_state_dict(gate_state_dict)
 
     def __init__(self, encoder_dir: str = None, tokenizer_name: str = None,
                  encoded_query_dir: str = None, device: str = 'cpu',
