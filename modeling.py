@@ -430,7 +430,7 @@ class MoeLayer(nn.Module):
         self.gate = gate
         self.args = moe_args
 
-    def forward(self, inputs: torch.Tensor, moe):
+    def forward(self, inputs: torch.Tensor):
         # 입력에 어떤 전문가가 적당한지를 계산
         gate_logits = self.gate(inputs)
         # 가장 높은 점수를 받은 전문가 num_experts_per_tok만큼 선택
