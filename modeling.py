@@ -41,6 +41,7 @@ class BGEM3Model(nn.Module):
                  use_self_distill: bool = False,
                  colbert_dim: int = -1,
                  self_distill_start_step: int = -1,
+                 moe: bool = False,
                  ):
         super().__init__()
         self.config = config
@@ -48,7 +49,7 @@ class BGEM3Model(nn.Module):
         self.num_experts = 3
         self.num_experts_per_tok = 1
 
-        self.load_model(model_name, colbert_dim=colbert_dim)
+        self.load_model(model_name, colbert_dim=colbert_dim, moe=moe)
         self.vocab_size = self.model.config.vocab_size
         self.cross_entropy = nn.CrossEntropyLoss(reduction='mean')
 
@@ -83,7 +84,7 @@ class BGEM3Model(nn.Module):
         #     nn.Linear(512, config.hidden_size)
         # )
 
-    def load_model(self, model_name, colbert_dim: int = -1):
+    def load_model(self, model_name, colbert_dim: int = -1, moe: bool = False):
         if not os.path.exists(model_name):
             cache_folder = os.getenv('HF_HUB_CACHE')
             model_name = snapshot_download(repo_id=model_name,
@@ -91,14 +92,17 @@ class BGEM3Model(nn.Module):
                                            ignore_patterns=['flax_model.msgpack', 'rust_model.ot', 'tf_model.h5'])
 
         self.model = AutoModel.from_pretrained(model_name)
-        # moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok)
-        # for layer in self.model.encoder.layer:
-        #     layer.output.dense = MoeLayer(
-        #         experts=[copy.deepcopy(layer.output.dense) for _ in range(self.num_experts)],
-        #         gate=torch.nn.Linear(layer.output.dense.in_features, self.num_experts, bias=False),
-        #         moe_args=moe_args,
-        #     )
-        print("moe 미적용")
+        if moe:
+            moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok)
+            for layer in self.model.encoder.layer:
+                layer.output.dense = MoeLayer(
+                    experts=[copy.deepcopy(layer.output.dense) for _ in range(self.num_experts)],
+                    gate=torch.nn.Linear(layer.output.dense.in_features, self.num_experts, bias=False),
+                    moe_args=moe_args,
+                )
+            print("moe 적용")
+        else:
+            print("moe 미적용")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self.colbert_linear = torch.nn.Linear(in_features=self.model.config.hidden_size,

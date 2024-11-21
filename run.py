@@ -113,7 +113,8 @@ def main():
                        use_self_distill=training_args.use_self_distill,
                        colbert_dim=training_args.colbert_dim,
                        self_distill_start_step=training_args.self_distill_start_step,
-                       config=config)
+                       config=config,
+                       moe=model_args.moe)
 
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
@@ -127,20 +128,18 @@ def main():
             else:
                 v.requires_grad = False
 
-    # model.encoder.layer.0.output.dense
-    # model.encoder.layer.1.attention.output.dense
-    # model.encoder.layer.0.intermediate.dense
+    if model_args.only_train:
+        if model_args.only_train == 'intermediate':
+            pattern = r'^model\.encoder\.layer\.(\d+)\.intermediate\.dense\..*$'
+        elif model_args.only_train == 'output':
+            pattern = r'^model\.encoder\.layer\.(\d+)\.output\.dense\..*$'
 
-    pattern1 = r'^model\.encoder\.layer\.(\d+)\.intermediate\.dense\..*$'
-    pattern2 = r'^model\.encoder\.layer\.(\d+)\.output\.dense\..*$'
-
-    for k, v in model.named_parameters():
-        match1 = re.match(pattern1, k)
-        match2 = re.match(pattern2, k)
-        if match2:
-            logging.info(f"train the parameters for {k}")
-        else:
-            v.requires_grad = False
+        for k, v in model.named_parameters():
+            match = re.match(pattern, k)
+            if match:
+                logging.info(f"train the parameters for {k}")
+            else:
+                v.requires_grad = False
 
     # print(f"===========================Rank {dist.get_rank()}: start loading data===========================")
     if data_args.same_task_within_batch:

@@ -371,13 +371,16 @@ class AutoQueryEncoder(QueryEncoder):
 
     def __init__(self, encoder_dir: str = None, tokenizer_name: str = None,
                  encoded_query_dir: str = None, device: str = 'cpu',
-                 pooling: str = 'cls', l2_norm: bool = False, **kwargs):
+                 pooling: str = 'cls', l2_norm: bool = False, moe: bool = False, **kwargs):
         super().__init__(encoded_query_dir)
         if encoder_dir:
             self.device = device
             self.model = AutoModel.from_pretrained(encoder_dir)
-            self.moe(encoder_dir)
-            print("moe 적용")
+            if moe:
+                self.moe(encoder_dir)
+                print("moe 적용")
+            else:
+                print("moe 미적용")
             self.model.to(self.device)
             try:
                 self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name or encoder_dir)

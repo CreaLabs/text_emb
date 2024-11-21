@@ -47,6 +47,10 @@ class ModelArgs:
         default=True,
         metadata={'help': "Normalize embeddings or not"}
     )
+    moe: bool = field(
+        default=False,
+        metadata={'help': "moe"}
+    )
 
 
 @dataclass
@@ -79,7 +83,8 @@ def get_model(model_args: ModelArgs):
         model_args.encoder,
         pooling_method=model_args.pooling_method,
         normalize_embeddings=model_args.normalize_embeddings,
-        use_fp16=model_args.fp16
+        use_fp16=model_args.fp16,
+        moe=model_args.moe
     )
     return model
 

@@ -347,14 +347,18 @@ class FlagModel:
             pooling_method: str = 'cls',
             normalize_embeddings: bool = True,
             query_instruction_for_retrieval: str = None,
-            use_fp16: bool = True
+            use_fp16: bool = True,
+            moe: bool = False
     ) -> None:
 
         # self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.tokenizer = AutoTokenizer.from_pretrained('BAAI/bge-m3')
         self.model = AutoModel.from_pretrained(model_name_or_path)
-        # self.moe(model_name_or_path)
-        print("moe 미적용")
+        if moe:
+            self.moe(model_name_or_path)
+            print("moe 적용")
+        else:
+            print("moe 미적용")
         self.query_instruction_for_retrieval = query_instruction_for_retrieval
         self.normalize_embeddings = normalize_embeddings
         self.pooling_method = pooling_method

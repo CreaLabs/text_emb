@@ -45,6 +45,10 @@ class ModelArgs:
         default=True,
         metadata={'help': "Normalize embeddings or not"}
     )
+    moe: bool = field(
+        default=False,
+        metadata={'help': "moe"}
+    )
 
 
 @dataclass
@@ -87,7 +91,8 @@ def get_query_encoder(model_args: ModelArgs):
         encoder_dir=model_args.encoder,
         device=device,
         pooling=model_args.pooling_method,
-        l2_norm=model_args.normalize_embeddings
+        l2_norm=model_args.normalize_embeddings,
+        moe=model_args.moe
     )
     return model
 
