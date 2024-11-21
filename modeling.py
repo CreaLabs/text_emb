@@ -42,12 +42,14 @@ class BGEM3Model(nn.Module):
                  colbert_dim: int = -1,
                  self_distill_start_step: int = -1,
                  moe: bool = False,
+                 num_experts: int = 1,
+                 num_experts_per_tok: int = 1,
                  ):
         super().__init__()
         self.config = config
 
-        self.num_experts = 3
-        self.num_experts_per_tok = 1
+        self.num_experts = num_experts
+        self.num_experts_per_tok = num_experts_per_tok
 
         self.load_model(model_name, colbert_dim=colbert_dim, moe=moe)
         self.vocab_size = self.model.config.vocab_size

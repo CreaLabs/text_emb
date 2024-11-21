@@ -30,6 +30,18 @@ class ModelArguments:
     only_train: Optional[str] = field(
         default=None, metadata={"help": "Only intermediate or output layers are trained"}
     )
+    num_experts: int = field(
+        default=1,
+        metadata={
+            "help": "num_experts"
+        },
+    )
+    num_experts_per_tok: int = field(
+        default=1,
+        metadata={
+            "help": "num_experts_per_tok"
+        },
+    )
 
 
 @dataclass

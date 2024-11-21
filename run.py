@@ -114,7 +114,9 @@ def main():
                        colbert_dim=training_args.colbert_dim,
                        self_distill_start_step=training_args.self_distill_start_step,
                        config=config,
-                       moe=model_args.moe)
+                       moe=model_args.moe,
+                       num_experts=model_args.num_experts,
+                       num_experts_per_tok=model_args.num_experts_per_tok)
 
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
