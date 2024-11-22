@@ -54,7 +54,7 @@ class BGEM3Model(nn.Module):
         self.moe = moe
         self.only_train = only_train
 
-        self.load_model(model_name, colbert_dim=colbert_dim, moe=moe)
+        self.load_model(model_name, colbert_dim=colbert_dim)
         self.vocab_size = self.model.config.vocab_size
         self.cross_entropy = nn.CrossEntropyLoss(reduction='mean')
 
