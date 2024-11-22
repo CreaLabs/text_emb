@@ -41,7 +41,8 @@ class BGEM3Model(nn.Module):
                  use_self_distill: bool = False,
                  colbert_dim: int = -1,
                  self_distill_start_step: int = -1,
-                 moe: bool = False,
+                 moe: str = '',
+                 only_train: str = '',
                  num_experts: int = 1,
                  num_experts_per_tok: int = 1,
                  ):
@@ -50,6 +51,8 @@ class BGEM3Model(nn.Module):
 
         self.num_experts = num_experts
         self.num_experts_per_tok = num_experts_per_tok
+        self.moe = moe
+        self.only_train = only_train
 
         self.load_model(model_name, colbert_dim=colbert_dim, moe=moe)
         self.vocab_size = self.model.config.vocab_size
@@ -86,7 +89,7 @@ class BGEM3Model(nn.Module):
         #     nn.Linear(512, config.hidden_size)
         # )
 
-    def load_model(self, model_name, colbert_dim: int = -1, moe: str = ''):
+    def load_model(self, model_name, colbert_dim: int = -1):
         if not os.path.exists(model_name):
             cache_folder = os.getenv('HF_HUB_CACHE')
             model_name = snapshot_download(repo_id=model_name,
@@ -94,17 +97,17 @@ class BGEM3Model(nn.Module):
                                            ignore_patterns=['flax_model.msgpack', 'rust_model.ot', 'tf_model.h5'])
 
         self.model = AutoModel.from_pretrained(model_name)
-        if moe:
-            moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok, moe)
+        if self.moe:
+            moe_args = MoeArgs(self.num_experts, self.num_experts_per_tok, self.moe)
             for layer in self.model.encoder.layer:
-                if moe == 'output':
+                if self.moe == 'output':
                     layer.output.dense = MoeLayer(
                         experts=[copy.deepcopy(layer.output.dense) for _ in range(self.num_experts)],
                         gate=torch.nn.Linear(layer.output.dense.in_features, self.num_experts, bias=False),
                         moe_args=moe_args,
                     )
                     print("moe output")
-                elif moe == 'intermediate':
+                elif self.moe == 'intermediate':
                     layer.intermediate.dense = MoeLayer(
                         experts=[copy.deepcopy(layer.intermediate.dense) for _ in range(self.num_experts)],
                         gate=torch.nn.Linear(layer.intermediate.dense.in_features, self.num_experts, bias=False),
@@ -383,27 +386,26 @@ class BGEM3Model(nn.Module):
                  v in state_dict.items()})
             return state_dict
 
-        # self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(self.model.state_dict()))
 
-        # if self.unified_finetuning:
-        #     torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
-        #                os.path.join(output_dir, 'colbert_linear.pt'))
-        #     torch.save(_trans_state_dict(self.sparse_linear.state_dict()),
-        #                os.path.join(output_dir, 'sparse_linear.pt'))
-
-        # moe
-        config = self.model.config
-        config.update({
-            "num_experts": self.num_experts,
-            "num_experts_per_tok": self.num_experts_per_tok,
-            "architectures": ["XLMRobertaModel", "MoEModel"]  # 모델 아키텍처 정보 추가 (선택 사항)
-        })
-        config.save_pretrained(output_dir)
+        if self.moe or self.only_train:
+            config = self.model.config
+            if self.moe:
+                config.update({
+                    "num_experts": self.num_experts,
+                    "num_experts_per_tok": self.num_experts_per_tok,
+                    "only_train": self.only_train,
+                    "moe": self.moe
+                })
+            else:
+                config.update({
+                    "only_train": self.only_train,
+                })
+            config.save_pretrained(output_dir)
 
         moe_state_dict = self.model.state_dict()
         self.model.save_pretrained(output_dir, state_dict=_trans_state_dict(moe_state_dict))  # MoE 가중치 저장
 
-        # 4. 추가적인 선형 레이어 저장 (기존 코드 유지)
+
         if self.unified_finetuning:
             torch.save(_trans_state_dict(self.colbert_linear.state_dict()),
                        os.path.join(output_dir, 'colbert_linear.pt'))
