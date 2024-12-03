@@ -171,6 +171,8 @@ def main():
 
     if 'data' in eval_args.languages[0]:
         index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), 'law')
+        if not os.path.exists(index_save_dir):
+            os.makedirs(index_save_dir)
         print('Generate embedding of ' + eval_args.languages[0])
         corpus = law_dataset_corpus(eval_args.languages[0])
         index, docid = generate_index(
