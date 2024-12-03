@@ -44,7 +44,7 @@ class TrainerCallbackForDataRefresh(TrainerCallback):
 # pip install sentencepiece
 # pip install --upgrade accelerate
 # pip install --upgrade wandb
-# python run.py --output_dir /root/paper/train_result/zh_base --model_name_or_path BAAI/bge-m3 --train_data /root/paper/train_data --learning_rate 1e-5 --fp16 y --num_train_epochs 1 --per_device_train_batch_size 1 --gradient_accumulation_steps 4 --dataloader_drop_last True --normlized True --temperature 0.02 --query_max_len 128 --passage_max_len 512 --train_group_size 5 --logging_steps 10 --same_task_within_batch True --unified_finetuning False --use_self_distill False --save_steps 10000000
+# python run.py --output_dir /root/paper/train_result/zh_base --model_name_or_path BAAI/bge-m3 --train_data /root/paper/train_data --learning_rate 1e-5 --fp16 y --num_train_epochs 1 --per_device_train_batch_size 1 --gradient_accumulation_steps 4 --dataloader_drop_last True --normlized True --temperature 0.02 --query_max_len 128 --passage_max_len 512 --train_group_size 5 --logging_steps 10 --same_task_within_batch True --unified_finetuning False --use_self_distill False
 
 def main():
     os.environ['MASTER_ADDR'] = 'localhost'

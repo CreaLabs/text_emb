@@ -113,6 +113,20 @@ def load_corpus(lang: str):
     corpus = datasets.Dataset.from_list(corpus_list)
     return corpus
 
+def law_dataset_corpus():
+    folder_path = '/data/js/data/law'
+    json_files = []
+    for filename in os.listdir(folder_path):
+        if filename.endswith(folder_path):
+            json_files.append(os.path.join('test', filename))
+    corpus_list = []
+    for file in json_files:
+        with open(file, 'r', encoding='utf-8') as f:
+            corpus = json.load(f)
+        for data in corpus:
+            corpus_list.append({'id': data['id'], 'content': data['contents']})
+    corpus = datasets.Dataset.from_list(corpus_list)
+    return corpus
 
 def generate_index(model: FlagModel, corpus: datasets.Dataset, max_passage_length: int=512, batch_size: int=256):
     corpus_embeddings = model.encode_corpus(corpus["content"], batch_size=batch_size, max_length=max_passage_length)
@@ -154,27 +168,34 @@ def main():
     print("==================================================")
     print("Start generating embedding with model:")
     print(model_args.encoder)
-
-    print('Generate embedding of following languages: ', languages)
-    for lang in languages:
-        print("**************************************************")
-        index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), lang)
-        if not os.path.exists(index_save_dir):
-            os.makedirs(index_save_dir)
-        if os.path.exists(os.path.join(index_save_dir, 'index')) and not eval_args.overwrite:
-            print(f'Embedding of {lang} already exists. Skip...')
-            continue
-
-        print(f"Start generating embedding of {lang} ...")
-        corpus = load_corpus(lang)
-
-        index, docid = generate_index(
-            model=model,
-            corpus=corpus,
-            max_passage_length=eval_args.max_passage_length,
-            batch_size=eval_args.batch_size
-        )
-        save_result(index, docid, index_save_dir)
+    corpus = law_dataset_corpus
+    index, docid = generate_index(
+        model=model,
+        corpus=corpus,
+        max_passage_length=eval_args.max_passage_length,
+        batch_size=eval_args.batch_size
+    )
+    save_result(index, docid, 'law')
+    # print('Generate embedding of following languages: ', languages)
+    # for lang in languages:
+    #     print("**************************************************")
+    #     index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), lang)
+    #     if not os.path.exists(index_save_dir):
+    #         os.makedirs(index_save_dir)
+    #     if os.path.exists(os.path.join(index_save_dir, 'index')) and not eval_args.overwrite:
+    #         print(f'Embedding of {lang} already exists. Skip...')
+    #         continue
+    #
+    #     print(f"Start generating embedding of {lang} ...")
+    #     corpus = load_corpus(lang)
+    #
+    #     index, docid = generate_index(
+    #         model=model,
+    #         corpus=corpus,
+    #         max_passage_length=eval_args.max_passage_length,
+    #         batch_size=eval_args.batch_size
+    #     )
+    #     save_result(index, docid, index_save_dir)
 
     print("==================================================")
     print("Finish generating embeddings with model:")
