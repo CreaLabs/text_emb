@@ -170,6 +170,7 @@ def main():
     print(model_args.encoder)
 
     if 'data' in eval_args.languages[0]:
+        index_save_dir = os.path.join(eval_args.index_save_dir, os.path.basename(encoder), 'law')
         print('Generate embedding of ' + eval_args.languages[0])
         corpus = law_dataset_corpus(eval_args.languages[0])
         index, docid = generate_index(
@@ -178,7 +179,7 @@ def main():
             max_passage_length=eval_args.max_passage_length,
             batch_size=eval_args.batch_size
         )
-        save_result(index, docid, 'law')
+        save_result(index, docid, index_save_dir)
     else:
         languages = check_languages(eval_args.languages)
         print('Generate embedding of following languages: ', languages)
