@@ -116,14 +116,17 @@ def load_corpus(lang: str):
 def law_dataset_corpus(folder_path):
     json_files = []
     for filename in os.listdir(folder_path):
-        if filename.endswith(folder_path):
-            json_files.append(os.path.join('test', filename))
+        if filename.endswith('.json'):
+            json_files.append(os.path.join(folder_path, filename))
     corpus_list = []
     for file in json_files:
         with open(file, 'r', encoding='utf-8') as f:
             corpus = json.load(f)
         for data in corpus:
-            corpus_list.append({'id': data['id'], 'content': data['contents']})
+            if data['contents']:
+                corpus_list.append({'id': data['id'], 'content': data['contents']})
+            else:
+                pass
     corpus = datasets.Dataset.from_list(corpus_list)
     return corpus
 
