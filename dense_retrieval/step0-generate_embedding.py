@@ -167,8 +167,8 @@ def main():
     print(model_args.encoder)
 
     if 'data' in eval_args.languages[0]:
-        print('Generate embedding of ' + eval_args.languages)
-        corpus = law_dataset_corpus(eval_args.languages)
+        print('Generate embedding of ' + eval_args.languages[0])
+        corpus = law_dataset_corpus(eval_args.languages[0])
         index, docid = generate_index(
             model=model,
             corpus=corpus,
