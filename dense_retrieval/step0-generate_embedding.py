@@ -153,8 +153,6 @@ def main():
     model_args: ModelArgs
     eval_args: EvalArgs
 
-    languages = check_languages(eval_args.languages)
-
     if model_args.encoder[-1] == '/':
         model_args.encoder = model_args.encoder[:-1]
 
@@ -168,9 +166,9 @@ def main():
     print("Start generating embedding with model:")
     print(model_args.encoder)
 
-    if 'data' in languages:
-        print('Generate embedding of ' + languages)
-        corpus = law_dataset_corpus(languages)
+    if 'data' in eval_args.languages:
+        print('Generate embedding of ' + eval_args.languages)
+        corpus = law_dataset_corpus(eval_args.languages)
         index, docid = generate_index(
             model=model,
             corpus=corpus,
@@ -179,6 +177,7 @@ def main():
         )
         save_result(index, docid, 'law')
     else:
+        languages = check_languages(eval_args.languages)
         print('Generate embedding of following languages: ', languages)
         for lang in languages:
             print("**************************************************")
