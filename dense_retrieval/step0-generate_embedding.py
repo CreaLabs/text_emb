@@ -124,7 +124,7 @@ def law_dataset_corpus(folder_path):
             corpus = json.load(f)
         for data in corpus:
             if data['contents']:
-                corpus_list.append({'id': data['id'], 'content': data['summary']})
+                corpus_list.append({'id': data['id'], 'content': data['contents']})
             else:
                 pass
     corpus = datasets.Dataset.from_list(corpus_list)
